@@ -1,0 +1,8 @@
+dist/
+patch/build/
+package/lib/*.jar
+*.apk
+*.dex
+.DS_Store
+systemui/tools/
+systemui/build/

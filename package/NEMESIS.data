@@ -1,0 +1,18 @@
+[nemesis]
+version=1.0
+id=kia.tweaks
+name=Kia tweaks
+types=application,service
+
+[app.0]
+kind=apk
+path=app/kia-tweaks.apk
+package=dev.kiatweaks
+component=dev.kiatweaks/.TweaksActivity
+
+[service.0]
+name=tweaksd
+kind=sh
+path=svc/tweaksd.sh
+uid=root
+mode=restart
