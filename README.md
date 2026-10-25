@@ -7,8 +7,8 @@ each with an on/off switch in the **Tweaks** app. Written for the 2023 Kia EV6 (
 | Tweak | What it does |
 |---|---|
 | Automatic daylight saving | Flips Kia's own daylight-saving switch on the US/Canada schedule. |
-| Recover stuck wireless Android Auto | Restarts Kia's Android Auto receiver when it gets stuck after the car's Wi-Fi hotspot was used. |
-| Keep wireless projection working with ADB TCP | Stops the Engineering Mode "ADB TCP" switch from breaking wireless Android Auto and CarPlay. |
+| Fix wireless Android Auto not connecting | Restarts Kia's Android Auto receiver when it gets stuck after the car's Wi-Fi hotspot was used. |
+| Wireless projection with ADB TCP | Stops the Engineering Mode "ADB TCP" switch from breaking wireless Android Auto and CarPlay. |
 | Skip start-up screen | No consent / driver screen at start-up. Changes SystemUI on `/system`, so it asks first and needs a restart. |
 
 ## How it works
@@ -36,3 +36,9 @@ KIA_MENU=../kia-menu sh build.sh     # -> dist/kia.tweaks.zip
 
 Needs the Android SDK (build-tools 29.0.2, platform 23) and JDK 11. Rebuilding the delta also
 needs the car's stock SystemUI and `bsdiff4==1.3.1` (see `systemui/build.sh`).
+
+## License
+
+AGPL-3.0-or-later (see `LICENSE`), Copyright (c) 2026 hazptr. Tweaks ported from
+[HMG Leafia Plus](https://github.com/VysseCodes/HMG-Leafia-Plus) (GPL-3.0) and from NEMESIS
+community packages (AGPL-3.0) keep their authors' notices; see `NOTICE.md`.
