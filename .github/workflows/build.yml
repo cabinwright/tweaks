@@ -14,7 +14,14 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
+      # full history and tags, for the release-to-release tweak id check
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # no tweak a release could turn on may disappear or change kind (see DESIGN.md)
+      - name: Tweak ids
+        run: sh tools/check-tweak-ids.sh
 
       # the kia-menu API the Tweaks app is built on, pinned to a release
       - uses: actions/checkout@v4
