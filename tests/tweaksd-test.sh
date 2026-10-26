@@ -148,6 +148,7 @@ echo "1761400000 restarted" > "$OLD/last/eth0-guard"
 echo boot-1 > "$OLD/skip-consent.pending"
 echo 4242 > "$OLD/run/auto-dst.pid"   # kia.tweaks' own bookkeeping: never imported
 cp -R "$A/tweaks.adb" "$OLD/shadow/tweaks.adb"
+cp -R "$A/cabinwright.tweaks" "$OLD/shadow/cabinwright.tweaks"   # kia.tweaks took the new package for a pack
 mkdir -p "$M/data/nemesis/backup/kia-tweaks.systemui"
 echo stock-apk > "$M/data/nemesis/backup/kia-tweaks.systemui/SystemUI.apk"
 echo stock-odex > "$M/data/nemesis/backup/kia-tweaks.systemui/SystemUI.odex"
@@ -166,6 +167,7 @@ in_state '"skip-consent":{"want":"on","state":"on"}'
 check 'grep -q "earlier log line" "$DATA/logs/skip-consent.log"' "logs imported"
 check '[ -f "$DATA/last/eth0-guard" ] && [ "$(cat "$DATA/skip-consent.pending")" = boot-1 ]' "last/ and the pending mark imported"
 check '[ -f "$DATA/shadow/tweaks.adb/NEMESIS.data" ]' "pack copies imported"
+check '[ ! -e "$DATA/shadow/cabinwright.tweaks" ]' "kia.tweaks' copy of cabinwright.tweaks not imported"
 check '[ "$(cat "$M/data/nemesis/backup/cabinwright.tweaks.systemui/SystemUI.odex")" = stock-odex ]' "skip-consent backup copied"
 check '[ ! -e "$DATA/run/auto-dst.pid" ]' "kia.tweaks' run/ not imported"
 check '[ "$(cat "$DATA/imported")" != final ]' "import not final while standing by"

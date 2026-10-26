@@ -576,7 +576,9 @@ import_legacy() {
     if [ -n "$first" ]; then
         # the copies of the packs (so a pack removed meanwhile is still turned off), logs,
         # the service tweaks' last actions, and skip-consent's stock SystemUI backup
+        # (not kia.tweaks' copy of this package, which it took for a pack, or of itself)
         for f in "$LEGACY_DATA"/shadow/*; do
+            case "${f##*/}" in "$(pkg_of "$TWEAKS/x")"|"$(pkg_of "$TWEAKS/x")".*|kia.tweaks|kia.tweaks.*) continue ;; esac
             [ -e "$f" ] && copy_new "$f" "$SHADOW/${f##*/}"
         done
         for f in "$LEGACY_DATA"/logs/*; do
