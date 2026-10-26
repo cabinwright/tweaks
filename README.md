@@ -18,9 +18,16 @@ each with an on/off switch in the **Tweaks** app. Written for the 2023 Kia EV6 (
 | `app/` | The Tweaks app (`dev.kiatweaks`). It is the only thing that decides which tweaks are on. |
 | `package/svc/tweaksd.sh` | Root service: reads the switches from the app (read-only provider), starts and stops tweaks, reports their state. |
 | `package/tweaks/<id>/` | One folder per tweak: `tweak.conf` plus shell scripts (`run.sh`, or `enable.sh` / `disable.sh` / `status.sh`). |
+| Tweak packs | Other NEMESIS packages with a `tweaks/<id>/` folder of their own. They show up in the same app. |
+| `tools/check-tweak-ids.sh` | CI check: a tweak that changes the system is never dropped between releases, only retired. |
 | `patch/` | `kiapatch`, a small tool run on the car that rebuilds patched system code from the car's own stock files. |
 | `systemui/` | Builds the skip-consent delta (`patch.py`, `build.sh`) and the USB rescue script. |
 | `docs/` | Notes on the head unit's internals. |
+
+Tweak packs need no install hooks. tweaksd keeps a copy of each pack, and when a pack is removed
+it turns that pack's tweaks off from the copy. A tweak that is no longer offered gets `retired=1`
+rather than being deleted. `replaces=` and `conflicts=` order renamed and incompatible tweaks.
+[DESIGN.md](DESIGN.md) has the tweak format and the full lifecycle.
 
 **No manufacturer code is shipped.** The skip-consent tweak carries a delta. On the car, `kiapatch`
 rebuilds the patched SystemUI from the unit's own stock files, and only if every checksum
