@@ -62,6 +62,7 @@ public class TweaksActivity extends KiaPage {
         final TextView name;
         final View dot;
         final TextView state;
+        View sep;
 
         Row(final Tweak t) {
             tweak = t;
@@ -150,13 +151,29 @@ public class TweaksActivity extends KiaPage {
         empty = text("No tweaks found. Is the kia.tweaks package installed?", 20, MUTED, false);
         empty.setPadding(dp(16), dp(20), dp(16), 0);
         list.addView(empty);
-        for (Tweak t : Tweak.all()) {
+        List<Tweak> tweaks = Tweak.all();
+        // what tweaksd still reports of removed packs' tweaks
+        DaemonState d = DaemonState.read();
+        JSONObject reported = d == null ? null : d.json.optJSONObject("tweaks");
+        if (reported != null) {
+            java.util.Set<String> ids = new java.util.HashSet<String>();
+            for (Tweak t : tweaks) ids.add(t.id);
+            for (java.util.Iterator<String> it = reported.keys(); it.hasNext(); ) {
+                String id = it.next();
+                JSONObject s = reported.optJSONObject(id);
+                if (!ids.contains(id) && s != null && (s.optBoolean("departed") || s.optBoolean("orphan") || s.optBoolean("pending"))) {
+                    tweaks.add(Tweak.leftBehind(id, s));
+                }
+            }
+        }
+        for (Tweak t : tweaks) {
             Row r = new Row(t);
             rows.add(r);
             list.addView(r.root);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2);
             lp.leftMargin = dp(12);
-            list.addView(line(SEP), lp);
+            r.sep = line(SEP);
+            list.addView(r.sep, lp);
         }
         empty.setVisibility(rows.isEmpty() ? View.VISIBLE : View.GONE);
     }
@@ -191,7 +208,7 @@ public class TweaksActivity extends KiaPage {
 
     private void toggle(Row r) {
         Tweak t = r.tweak;
-        if (!t.supported()) {
+        if (!t.supported() || t.retired) {
             select(rows.indexOf(r));
             return;
         }
@@ -264,8 +281,14 @@ public class TweaksActivity extends KiaPage {
     private void showRow(Row r, boolean isSelected, boolean alive) {
         Tweak t = r.tweak;
         Look l = look(t, alive);
-        r.check.setChecked(t.supported() && isChecked(t));
-        r.check.setAlpha(t.supported() ? 1f : 0.35f);
+        // a retired tweak shows only while it's still in effect
+        JSONObject s = daemon == null ? null : daemon.tweak(t.id);
+        String st = s == null ? "" : s.optString("state");
+        boolean hide = t.retired && !st.equals("on") && !st.equals("working") && !st.equals("error");
+        r.root.setVisibility(hide ? View.GONE : View.VISIBLE);
+        if (r.sep != null) r.sep.setVisibility(hide ? View.GONE : View.VISIBLE);
+        r.check.setChecked(t.supported() && !t.retired && isChecked(t));
+        r.check.setAlpha(t.supported() && !t.retired ? 1f : 0.35f);
         r.name.setTextColor(isSelected ? ACCENT : TEXT);
         r.dot.setBackground(rounded(l.color, dp(5)));
         r.state.setText(l.label);

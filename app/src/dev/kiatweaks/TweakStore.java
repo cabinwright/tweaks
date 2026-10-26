@@ -38,8 +38,17 @@ final class TweakStore {
      * is nothing to go on: tweaksd then leaves the tweak alone.
      */
     Boolean desired(Tweak t, DaemonState d) {
+        if (t.retired) return false;
         String key = "on." + t.id;
         if (prefs.contains(key)) return prefs.getBoolean(key, false);
+        // a renamed tweak keeps the old one's switch
+        for (String old : t.replaces) {
+            if (!prefs.contains("on." + old)) continue;
+            boolean on = prefs.getBoolean("on." + old, false);
+            prefs.edit().putBoolean(key, on).commit();
+            backup();
+            return on;
+        }
         if (!t.oneshot() && !t.system) return t.defaultOn;
         JSONObject s = d == null || !d.trusted ? null : d.tweak(t.id);
         String state = s == null ? "" : s.optString("state");
