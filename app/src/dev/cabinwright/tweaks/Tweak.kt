@@ -1,146 +1,89 @@
 package dev.cabinwright.tweaks
 
+import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.File
-import java.io.FileReader
-import java.io.IOException
-import java.util.regex.Pattern
+
+/** One thing a tweak needs, and why, in the tweak's own plain words. */
+internal class Need(val what: String, val reason: String)
 
 /**
- * One tweak folder, from its tweak.conf: cabinwright.tweaks' own, or a tweak pack's (another NEMESIS
- * package with a tweaks/ folder). The package files are world-readable, so the app reads them
- * where NEMESIS put them rather than keeping a copy.
+ * One tweak as the store's runner reports it (`tweaks/list`): cabinwright.tweaks' own or a tweak
+ * pack's. The runner keeps the switches, so [desired] is its record of what the driver chose.
  */
-internal class Tweak private constructor(val id: String) {
-    /** The NEMESIS package the tweak comes from. */
-    var pack = ""
-    var name = id
-    var summary = ""
-    var description = ""
-    var firmware = "*"
-    var kind = "service"
-    var defaultOn = false
-    var system = false
+internal class Tweak private constructor(o: JSONObject) {
+    val id: String = o.optString("id")
 
-    /** retired=1: no longer offered; always off, hidden once it is. */
-    var retired = false
+    /** The package the tweak comes from, as the store knows it (e.g. cabinwright.tweaks). */
+    val pack: String = o.optString("package")
+    val name: String = o.optString("name", id).ifEmpty { id }
+    val summary: String = o.optString("summary")
+    val description: String = o.optString("description")
+    val kind: String = o.optString("kind")
+    val needs: List<Need> = needs(o.optJSONArray("needs"))
+    val firmwareOk: Boolean = o.optBoolean("firmware_ok", true)
 
-    /** replaces=: earlier ids of this tweak, whose switch carries over. */
-    var replaces = emptyList<String>()
+    /** The tweak's firmware= line, when the runner sends it. */
+    val firmware: String = o.optString("firmware")
+    val desired: Boolean = o.optBoolean("desired")
 
-    /** Not in any installed package: what tweaksd still reports of a removed pack's tweak. */
-    var leftBehind = false
+    /** on, off, error or working; "" before the runner has a state for it. */
+    val state: String = o.optString("state")
 
-    fun oneshot(): Boolean = kind == "oneshot"
+    /** The status text (status.sh's, or the runner's). */
+    val text: String = o.optString("text").trimSpaces()
 
-    /** firmware= is "*" or exact ro.build.product strings, separated by spaces or commas. */
-    fun supported(): Boolean {
-        if (firmware.trimSpaces() == "*") return true
-        val fw = firmware()
-        return SEPARATORS.split(firmware).any { it == fw }
-    }
+    /** Paused by safe mode. */
+    val safeMode: Boolean = o.optBoolean("safe_mode")
+
+    /** Any `file:` need: it changes system files, so the app asks before switching it. */
+    fun changesFiles(): Boolean = needs.any { it.what.startsWith("file:") }
 
     companion object {
-        val APPS = File("/data/nemesis/apps")
+        /** This app's own package in the store, which also holds the base tweaks. */
         const val OWN = "cabinwright.tweaks"
 
-        // java.util.regex rather than Kotlin's Regex, which brings much of the stdlib with it
-        private val ID = Pattern.compile("[a-z0-9-]+")
-        private val SEPARATORS = Pattern.compile("[\\s,]+")
-        private var carFirmware: String? = null
-
-        /**
-         * All tweaks: cabinwright.tweaks' own, then each pack's, by package id and then folder name. As in
-         * tweaksd, an id belongs to the first package that has it, and ids are limited to what
-         * tweaksd accepts.
-         */
-        fun all(): MutableList<Tweak> {
+        /** The tweaks in a `tweaks/list` reply: an array, or an object with a "tweaks" array. */
+        fun list(data: Any?): List<Tweak> {
+            val a = when (data) {
+                is JSONArray -> data
+                is JSONObject -> data.optJSONArray("tweaks")
+                else -> null
+            } ?: return emptyList()
             val out = ArrayList<Tweak>()
-            val seen = HashSet<String>()
-            val packs = mutableListOf(OWN)
-            APPS.list()?.sorted()?.filterTo(packs) { it != OWN }
-            for (pack in packs) {
-                val dir = File(File(APPS, pack), "tweaks")
-                val ids = dir.list() ?: continue
-                // an id belongs to the first package that has it (a folder's names are unique)
-                for (id in ids.sorted().filter { ID.matcher(it).matches() && it !in seen }) {
-                    val t = load(dir, id) ?: continue
-                    t.pack = pack
-                    seen.add(id)
-                    out.add(t)
+            for (i in 0 until a.length()) {
+                val o = a.optJSONObject(i) ?: continue
+                val t = Tweak(o)
+                if (t.id.isNotEmpty()) out.add(t)
+            }
+            return out
+        }
+
+        /** Safe mode is on: a reply that says so at the top, or any tweak it paused. */
+        fun safeMode(data: Any?, tweaks: List<Tweak>): Boolean =
+            (data as? JSONObject)?.optBoolean("safe_mode") == true || tweaks.any { it.safeMode }
+
+        /** Each need is "need | reason" as in tweak.conf, or {"need", "reason"}. */
+        private fun needs(a: JSONArray?): List<Need> {
+            if (a == null) return emptyList()
+            val out = ArrayList<Need>()
+            for (i in 0 until a.length()) {
+                val o = a.optJSONObject(i)
+                if (o != null) {
+                    out.add(Need(o.optString("need"), o.optString("reason")))
+                    continue
+                }
+                val s = a.optString(i)
+                val bar = s.indexOf('|')
+                if (bar < 0) {
+                    out.add(Need(s.trimSpaces(), ""))
+                } else {
+                    out.add(Need(s.substring(0, bar).trimSpaces(), s.substring(bar + 1).trimSpaces()))
                 }
             }
             return out
         }
 
-        /**
-         * A tweak tweaksd still reports that no installed package has: one whose pack is gone for
-         * the moment ("pending"), one being turned off because its pack was removed ("departed"),
-         * or one left on that it can't turn off ("orphan"). Shown read-only, so it isn't forgotten
-         * while it's still in effect.
-         */
-        fun leftBehind(id: String, s: JSONObject): Tweak {
-            val t = Tweak(id)
-            t.name = s.optString("name", id)
-            val pack = s.optString("pack")
-            if (s.optBoolean("orphan")) {
-                t.summary = "Left on by $pack, which was removed"
-                t.description = "The package that made this change was removed before it could be undone. " +
-                    "Install $pack again and turn this off there, or restore the original files by hand."
-            } else if (s.optBoolean("pending")) {
-                t.summary = "$pack is being updated or removed"
-                t.description = "If $pack isn't back within a minute, Tweaks turns this off."
-            } else {
-                t.summary = "Being turned off: $pack was removed"
-                t.description = "Its package was removed, so Tweaks is putting back what it changed."
-            }
-            t.kind = "oneshot"
-            t.retired = true
-            t.leftBehind = true
-            return t
-        }
-
-        private fun load(dir: File, id: String): Tweak? {
-            val t = Tweak(id)
-            try {
-                val input = BufferedReader(FileReader(File(File(dir, id), "tweak.conf")))
-                try {
-                    t.read(input)
-                } finally {
-                    input.close()
-                }
-            } catch (ignored: IOException) {
-                return null
-            }
-            return t
-        }
-
-        /** key=value lines; # starts a comment line. */
-        private fun Tweak.read(input: BufferedReader) {
-            var line = input.readLine()
-            while (line != null) {
-                val eq = line.indexOf('=')
-                if (eq > 0 && !line.startsWith("#")) {
-                    set(line.substring(0, eq).trimSpaces(), line.substring(eq + 1).trimSpaces())
-                }
-                line = input.readLine()
-            }
-        }
-
-        private fun Tweak.set(k: String, v: String) {
-            when (k) {
-                "name" -> name = v
-                "summary" -> summary = v
-                "description" -> description = v
-                "firmware" -> firmware = v
-                "kind" -> kind = v
-                "default" -> defaultOn = v == "on"
-                "risk" -> system = v == "system"
-                "retired" -> retired = v == "1"
-                "replaces" -> replaces = if (v.isEmpty()) emptyList() else SEPARATORS.split(v).asList()
-            }
-        }
+        private var carFirmware: String? = null
 
         /** The head unit's software, ro.build.product (e.g. CVEV.USA.0000.V015.012.260507). */
         fun firmware(): String {

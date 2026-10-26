@@ -1,8 +1,10 @@
 /**
  * Rebuilds patched system app code on the head unit from its own stock files, so nothing of
- * the manufacturer's is shipped. Run as root with app_process:
+ * the manufacturer's is shipped. Run by a tweak, as the tweak's own uid, with app_process
+ * and a dalvik-cache of its own in $TWEAK_DATA:
  *
- *   CLASSPATH=tweakpatch.jar app_process /system/bin dev.cabinwright.tweaks.patch.Main <command> ...
+ *   ANDROID_DATA=<dir with dalvik-cache/> CLASSPATH=tweakpatch.jar \
+ *       app_process /system/bin dev.cabinwright.tweaks.patch.Main <command> ...
  *
  *   md5 <file>                      print the file's md5
  *   delta <patch.lpd> <src> <dst>   rebuild dst from src (HMG Leafia Plus's .lpd format:

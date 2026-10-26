@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# One line for tweaksd: on|off|error <text>, from run.sh's check mode
+# One line for the runner: on|off|error <text>, from run.sh's check mode
 # ("zone=Mobis/UTC-05:00 offset=5 rule=M3.2.0,M11.1.0 want=1 unit=1").
 r=$(sh "${0%/*}/run.sh" check)
 zone=${r#zone=}; zone=${zone%% *}

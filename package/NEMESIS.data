@@ -1,18 +1,11 @@
 [nemesis]
-version=1.4.1
 id=cabinwright.tweaks
 name=Tweaks
-types=application,service
+version=1.0
+types=application
 
 [app.0]
 kind=apk
-path=app/tweaks.apk
+path=tweaks.apk
 package=dev.cabinwright.tweaks
 component=dev.cabinwright.tweaks/.TweaksActivity
-
-[service.0]
-name=tweaksd
-kind=sh
-path=svc/tweaksd.sh
-uid=root
-mode=restart

@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="dev.cabinwright.tweaks"
-    android:versionCode="6"
-    android:versionName="1.4.1">
+    android:versionCode="1"
+    android:versionName="1.0">
 
     <uses-sdk android:minSdkVersion="19" android:targetSdkVersion="19" />
-    <!-- keeps a copy of the switches on the sdcard, since package updates wipe app data -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <!-- The head unit's ActivityManager calls getTasks() when an app finishes its last activity (Back):
          without this the app crashes on the way out -->
     <uses-permission android:name="android.permission.GET_TASKS" />
@@ -32,11 +30,5 @@
             <meta-data android:name="dev.cabinwright.icon" android:resource="@drawable/menu_icon" />
             <meta-data android:name="dev.cabinwright.icon_disabled" android:resource="@drawable/menu_icon_dis" />
         </activity>
-
-        <!-- tweaksd reads the switches here with `content query` (root, system and shell only) -->
-        <provider
-            android:name=".StateProvider"
-            android:authorities="dev.cabinwright.tweaks.state"
-            android:exported="true" />
     </application>
 </manifest>

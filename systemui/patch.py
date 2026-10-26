@@ -21,13 +21,12 @@ ANCHOR = ("    :cond_14d\n"
           "\n"
           "    goto/16 :goto_7d\n"
           ".end method\n" % D)
-# The log line keeps the project's old name: it is inside the shipped delta (systemui.lpd)
-# and the checksum of the patched SystemUI (SUM_OURS), which cars already run. Changing it
-# would need a new delta built from the car's stock files and a new checksum.
+# The log line is part of the shipped delta (systemui.lpd) and of the patched SystemUI's
+# checksum (SUM_OURS in tweaks/skip-consent/common.sh): build.sh prints both.
 HOOK = ("    :cond_14d\n"
         "    invoke-direct {p0}, %s->dc()V\n"
         "    const-string v1, \"ConsentScreenUI\"\n"
-        "    const-string v2, \"kia-tweaks: consent screen skipped at start-up\"\n"
+        "    const-string v2, \"Cabinwright: consent screen skipped at start-up\"\n"
         "    invoke-static {v1, v2}, Landroid/util/Slog;->i(Ljava/lang/String;Ljava/lang/String;)I\n"
         "\n"
         "    goto/16 :goto_7d\n"

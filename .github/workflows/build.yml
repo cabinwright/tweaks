@@ -14,29 +14,14 @@ jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      # full history and tags, for the release-to-release tweak id check
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      # no tweak a release could turn on may disappear or change kind (see DESIGN.md)
-      - name: Tweak ids
-        run: sh tools/check-tweak-ids.sh
-
-      # tweaksd against a mock head unit: the move from kia.tweaks, removed and shared tweaks,
-      # log rotation. In mksh, the car's shell, and in bash
-      - name: tweaksd host test
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq mksh > /dev/null
-          KT_SH=mksh sh tests/tweaksd-test.sh
-          KT_SH=bash sh tests/tweaksd-test.sh
-
-      # the Cabinwright API the Tweaks app is built on, and its pinned tools and lint settings,
-      # pinned to a release
+      # the Cabinwright API the Tweaks app is built on (CarPage, CarBroker), and its pinned tools
+      # and lint settings, pinned to a release
       - uses: actions/checkout@v4
         with:
           repository: cabinwright/menu
-          ref: v1.3
+          ref: v1.0
           path: menu
 
       # before setup-java: the runner's sdkmanager needs its default (newer) Java.
@@ -58,7 +43,7 @@ jobs:
       - name: Tools
         run: sh menu/api/tools/fetch-tools.sh
 
-      # ktlint, detekt and ShellCheck (tweaksd and the tweak scripts as the car's mksh)
+      # ktlint, detekt and ShellCheck (the tweak scripts as the car's mksh)
       - name: Lint
         run: sh menu/api/tools/lint.sh .
 
@@ -111,12 +96,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > "$RUNNER_TEMP/notes.md" <<NOTES
-          NEMESIS package \`cabinwright.tweaks\` $VERSION: install \`cabinwright.tweaks-v$VERSION.zip\` with NEMESIS
-          (USB stick, or \`nemesis install --update <zip>\` over ADB).
+          NEMESIS package \`cabinwright.tweaks\` $VERSION: the Tweaks app and the base tweaks. Install it
+          from the Cabinwright store, which runs the tweaks.
           \`cabinwright.tweaks-v$VERSION.map\` (the Tweaks app) and \`cabinwright.tweaks-v$VERSION-tweakpatch.map\`
           (the patch tool) are R8's name maps, for reading stack traces (retrace).
-
-          The Tweaks app shows up in All Menus with the Cabinwright launcher hook installed.
           NOTES
           gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.map --title "Cabinwright tweaks $GITHUB_REF_NAME" \
             --notes-file "$RUNNER_TEMP/notes.md" --generate-notes
