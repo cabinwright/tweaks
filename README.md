@@ -7,9 +7,11 @@ each with an on/off switch in the **Tweaks** app. Written for the 2023 Kia EV6 (
 | Tweak | What it does |
 |---|---|
 | Automatic daylight saving | Flips the head unit's own daylight-saving switch on the US/Canada schedule. |
-| Fix wireless Android Auto not connecting | Restarts the head unit's Android Auto receiver when it gets stuck after the car's Wi-Fi hotspot was used. |
-| Wireless projection with ADB TCP | Stops the Engineering Mode "ADB TCP" switch from breaking wireless Android Auto and CarPlay. |
 | Skip start-up screen | No consent / driver screen at start-up. Changes SystemUI on `/system`, so it asks first and needs a restart. |
+
+Two older tweaks, "Fix wireless Android Auto not connecting" and "Wireless projection with ADB TCP", are
+retired: they are switched off and hidden, and the
+[tweaks-projection](https://github.com/cabinwright/tweaks-projection) pack does their job now.
 
 ## How it works
 
