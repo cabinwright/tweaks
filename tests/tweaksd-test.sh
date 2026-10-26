@@ -12,6 +12,7 @@
 #      ours) are not departed and not turned off; the copy goes
 #   D. a removed pack's tweak that another installed pack provides continues from that pack
 #   E. control: a removed pack's own tweak is still turned off from its copy
+#   F. a tweak's log is rotated once it is over 32 KiB (ls -l as toolbox prints it)
 #
 # usage: tests/tweaksd-test.sh      (KT_SH picks the shell: default mksh, else bash with a
 #                                    `print` stand-in for mksh's builtin)
@@ -65,6 +66,16 @@ EOF
 cat > "$W/stubs/ps" <<'EOF'
 #!/bin/sh
 echo "USER     PID   PPID  VSIZE  RSS   PCY  WCHAN    PC         NAME"
+EOF
+# toolbox's ls -l has no link count: mode, owner, group, size, date, time, name
+cat > "$W/stubs/ls" <<'EOF'
+#!/bin/sh
+if [ "$1" = -l ]; then
+    shift
+    /bin/ls -ln "$@" | while read -r mode links owner group rest; do echo "$mode $owner $group $rest"; done
+else
+    exec /bin/ls "$@"
+fi
 EOF
 cat > "$W/stubs/nemesis" <<'EOF'
 #!/bin/sh
@@ -233,6 +244,18 @@ check 'grep -q "disable c.pack only-c" "$ACT"' "only-c turned off with the copy'
 check '[ "$(cat "$M/car/only-c")" = off ]' "only-c off"
 check '[ ! -e "$DATA/shadow/c.pack" ] && [ ! -e "$DATA/index/only-c" ]' "c.pack's copy and tweak gone"
 check '[ "$(cat "$M/car/skip-consent")$(cat "$M/car/adb-wifi")$(cat "$M/car/shared-x")" = ononon ]' "the others still on"
+
+echo "F. a big log is rotated"
+package f.pack 1.0; tweak "$A/f.pack" big-log oneshot
+car big-log off; echo 1 > "$DATA/want/big-log"
+mkdir -p "$DATA/logs"
+i=0; while [ $i -lt 700 ]; do echo "an old line of fifty bytes, give or take a few $i"; i=$((i + 1)); done \
+    > "$DATA/logs/big-log.log"
+tweaksd 2
+check 'grep -q "old line of fifty bytes, give or take a few 699" "$DATA/logs/big-log.log.1"' "the old log kept as .log.1"
+check '! grep -q "old line" "$DATA/logs/big-log.log" && grep -q "running enable.sh" "$DATA/logs/big-log.log"' \
+    "a new log started"
+check '[ "$(cat "$M/car/big-log")" = on ]' "big-log on"
 
 echo "kia.tweaks' files were only read"
 ok "kia-tweaks/ and backup/kia-tweaks.systemui unchanged by all $RUNS runs (checked after each)"

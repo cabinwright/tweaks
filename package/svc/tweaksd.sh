@@ -113,7 +113,8 @@ get() { cat "$RUN/$1.$2" 2>/dev/null; }
 # only when it changes: this is flash, and some values are re-put every round
 put() {
     local v
-    [ -f "$RUN/$1.$2" ] && IFS= read -r v < "$RUN/$1.$2" && [ "$v" = "$3" ] || print -r -- "$3" > "$RUN/$1.$2"
+    if [ -f "$RUN/$1.$2" ] && IFS= read -r v < "$RUN/$1.$2" && [ "$v" = "$3" ]; then return 0; fi
+    print -r -- "$3" > "$RUN/$1.$2"
 }
 
 # state: on, off, error, working or unsupported; the time of the last change is kept
@@ -140,7 +141,7 @@ status_of() {
     read -r t < "$INDEX/$1"
     [ -f "$t/status.sh" ] || { print "error no status.sh"; return; }
     s=$(sh "$t/status.sh" 2>/dev/null)
-    s=${s%%$CR*}
+    s=${s%%"$CR"*}
     case "$s" in
         on|off|error) print -r -- "$s" ;;
         "on "*|"off "*|"error "*) print -r -- "$s" ;;
@@ -148,10 +149,18 @@ status_of() {
     esac
 }
 
+# toolbox has no stat or wc: the size is ls -l's 4th field (mode, owner, group, size, date,
+# time, name). Not `ls | read`: mksh runs every part of a pipeline in a subshell.
 rotate() {
-    local p u g size rest
-    ls -l "$LOGS/$1.log" 2>/dev/null | read -r p u g size rest
-    [ "${size:-0}" -gt $LOG_MAX ] 2>/dev/null && mv "$LOGS/$1.log" "$LOGS/$1.log.1"
+    local l w n=0 size=0
+    l=$(ls -l "$LOGS/$1.log" 2>/dev/null)
+    set -f
+    for w in $l; do
+        n=$((n + 1))
+        [ $n = 4 ] && size=$w
+    done
+    set +f
+    [ "$size" -gt $LOG_MAX ] 2>/dev/null && mv "$LOGS/$1.log" "$LOGS/$1.log.1"
 }
 
 # ---- kind=service
@@ -159,12 +168,12 @@ rotate() {
 running() {   # pid of the tweak's run.sh while it is alive
     local p
     p=$(get "$1" pid)
-    [ -n "$p" ] && grep -q "/tweaks/$1/run.sh" /proc/$p/cmdline 2>/dev/null && print "$p"
+    [ -n "$p" ] && grep -q "/tweaks/$1/run.sh" "/proc/$p/cmdline" 2>/dev/null && print "$p"
 }
 
 children() {
-    local u p pp rest
-    ps | while read -r u p pp rest; do [ "$pp" = "$1" ] && print "$p"; done
+    local p pp rest
+    ps | while read -r _ p pp rest; do [ "$pp" = "$1" ] && print "$p"; done
 }
 
 # run.sh's own children (sleep, logcat, ...) would outlive it, so take them down too
@@ -213,7 +222,7 @@ do_service() {   # <id> <want>
     s=$(status_of "$1")
     case "$s" in
         error*) set_state "$1" error "$(text_of "$s")" ;;
-        *) [ -n "$p" ] && set_state "$1" on "$(text_of "$s")" || set_state "$1" off "$(text_of "$s")" ;;
+        *) if [ -n "$p" ]; then set_state "$1" on "$(text_of "$s")"; else set_state "$1" off "$(text_of "$s")"; fi ;;
     esac
 }
 
@@ -265,8 +274,9 @@ do_oneshot() {   # <id> <want> <recheck: 1 to run status.sh now>
 # ---- the app
 
 app_proc() {   # "<pid> <fg|bg>" while the app runs
-    local u p pp vs rss pcy rest
-    ps -P | while read -r u p pp vs rss pcy rest; do
+    local p pcy rest
+    # USER PID PPID VSIZE RSS PCY ...
+    ps -P | while read -r _ p _ _ _ pcy rest; do
         case "$rest" in *" $APP") print "$p $pcy"; break ;; esac
     done
 }
@@ -290,14 +300,17 @@ read_desired() {
         [ "$(cat "$WANT/$id" 2>/dev/null)" = "$on" ] || { print "$on" > "$WANT/$id"; rm -f "$RUN/$id.failed"; }
     done
     gen=${out##*gen=}; gen=${gen%%[!0-9]*}
-    if [ "$gen" != "$(cat $DATA/gen 2>/dev/null)" ]; then
-        print "$gen" > $DATA/gen
+    if [ "$gen" != "$(cat "$DATA/gen" 2>/dev/null)" ]; then
+        print "$gen" > "$DATA/gen"
         CHANGED=1
     fi
     return 0
 }
 
 # ---- state.json
+
+# a switch position (1 or 0) as JSON's "on" or "off"; nothing for none
+on_off() { case "$1" in 1) print on ;; 0) print off ;; esac; }
 
 js() {   # a JSON string
     local s=$1
@@ -325,7 +338,7 @@ tweak_json() {
     local e w
     e=$(get "$1" error)
     w=$(effective_want "$1")
-    print -n "$(js "$1"):{\"want\":$(js "$([ "$w" = 1 ] && print on || { [ "$w" = 0 ] && print off; })")"
+    print -n "$(js "$1"):{\"want\":$(js "$(on_off "$w")")"
     print -n ",\"state\":$(js "$(get "$1" state)"),\"text\":$(js "$(get "$1" text)")"
     print -n ",\"last_change\":$(get "$1" since || print 0)"
     print -n ",\"name\":$(js "$(get "$1" name)"),\"pack\":$(js "$(get "$1" pack)")"
@@ -334,7 +347,7 @@ tweak_json() {
     [ -n "$(get "$1" orphan)" ] && print -n ',"orphan":true'
 
     # the script for the current switch position failed: it waits for the next change
-    [ -n "$w" ] && [ "$(get "$1" failed)" = "$w" ] && print -n ',"failed":true' || print -n ',"failed":false'
+    if [ -n "$w" ] && [ "$(get "$1" failed)" = "$w" ]; then print -n ',"failed":true'; else print -n ',"failed":false'; fi
     print -n ",\"last_error\":$(js "${e#* }"),\"last_error_time\":${e%% *}"
     [ -n "$e" ] || print -n 0
     print -n ",\"log\":$(log_tail "$1")}"
@@ -342,18 +355,19 @@ tweak_json() {
 
 LAST_BODY=
 write_state() {
-    local d id sep= body
+    local d id sep='' body app_seen=false
+    [ -n "$APP_READ" ] && app_seen=true
     body=$(
-        print -n "\"pid\":$$,\"firmware\":$(js "$FIRMWARE"),\"app_seen\":$( [ -n "$APP_READ" ] && print true || print false),\"tweaks\":{"
+        print -n "\"pid\":$$,\"firmware\":$(js "$FIRMWARE"),\"app_seen\":$app_seen,\"tweaks\":{"
         for d in "$INDEX"/*; do
             [ -f "$d" ] || continue
             print -n "$sep"; tweak_json "${d##*/}"; sep=,
         done
         print -n '}'
     )
-    print -r -- "{\"time\":$(date +%s),$body}" > $DATA/state.json.tmp
-    chmod 644 $DATA/state.json.tmp
-    mv $DATA/state.json.tmp $DATA/state.json
+    print -r -- "{\"time\":$(date +%s),$body}" > "$DATA/state.json.tmp"
+    chmod 644 "$DATA/state.json.tmp"
+    mv "$DATA/state.json.tmp" "$DATA/state.json"
     # the sdcard copy only when something changed (it is flash). Root here lacks
     # CAP_DAC_OVERRIDE and the sdcard sits behind /mnt/shell (shell's, mode 700): copy as shell.
     if [ "$body" != "$LAST_BODY" ]; then
@@ -370,7 +384,7 @@ pkg_of() { local p=${1%/tweaks/*}; print -r -- "${p##*/}"; }
 nemesis_busy() {
     local f
     # cmdline separates arguments with NULs, which the shell can't hold: grep the file
-    for f in $R/proc/[0-9]*/cmdline; do
+    for f in "$R"/proc/[0-9]*/cmdline; do
         grep -q nemesis "$f" 2>/dev/null && grep -q install "$f" 2>/dev/null && return 0
     done
     return 1
@@ -396,7 +410,7 @@ shadow_packs() {
         # not while NEMESIS may still be writing it: a half copy would never be refreshed
         nemesis_busy && continue
         rm -rf "$SHADOW/$p.tmp"
-        cp -R "$d" "$SHADOW/$p.tmp" && rm -rf "$SHADOW/$p" && mv "$SHADOW/$p.tmp" "$SHADOW/$p" \
+        cp -R "$d" "$SHADOW/$p.tmp" && rm -rf "${SHADOW:?}/$p" && mv "$SHADOW/$p.tmp" "$SHADOW/$p" \
             && log "kept a copy of $p $(version_of "$d")" >&2
     done
     for d in "$SHADOW"/*/; do
@@ -405,7 +419,7 @@ shadow_packs() {
         [ -d "$PACKS/$p" ] && continue
         [ -f "$SHADOW/$p.missing" ] || { print "$now" > "$SHADOW/$p.missing"; log "$p is gone; turning its tweaks off in ${DEPART_AFTER}s unless it comes back" >&2; }
         nemesis_busy && print "$now" > "$SHADOW/$p.missing"
-        [ $((now - $(cat "$SHADOW/$p.missing"))) -ge $DEPART_AFTER ] && print -r -- "$d"
+        [ $((now - $(cat "$SHADOW/$p.missing"))) -ge "$DEPART_AFTER" ] && print -r -- "$d"
     done
 }
 
@@ -445,7 +459,7 @@ clear_of_conflicts() {
 # rebuilds $INDEX: every tweak folder of cabinwright.tweaks and the installed tweak packs, then the
 # tweaks of removed packs (from their copies, marked departed) until they are off.
 index_tweaks() {
-    local d id own seen= f gone p v
+    local d id own seen='' f gone p v
     # only ever folders inside $SHADOW: these get deleted below
     gone=
     for p in $(shadow_packs); do
@@ -540,7 +554,7 @@ stop_all() {
 # kia.tweaks' tweaksd is running (its command line names its script)
 legacy_running() {
     local f
-    for f in $R/proc/[0-9]*/cmdline; do
+    for f in "$R"/proc/[0-9]*/cmdline; do
         grep -q "$LEGACY_SVC" "$f" 2>/dev/null && return 0
     done
     return 1
@@ -590,7 +604,8 @@ import_legacy() {
     [ -f "$LEGACY_DATA/state.json" ] && [ ! -f "$DATA/state.json" ] && standby_state
     print -r -- "${st:-none}" > "$DATA/imported"
     if [ -n "$first" ]; then
-        log "imported kia.tweaks' data from $LEGACY_DATA (read only): switches $(ls "$WANT" | while read -r f; do print -n "$f=$(cat "$WANT/$f") "; done)"
+        log "imported kia.tweaks' data from $LEGACY_DATA (read only): switches $(for f in "$WANT"/*; do
+            [ -f "$f" ] && print -n "${f##*/}=$(cat "$f") "; done)"
     fi
 }
 
@@ -611,27 +626,27 @@ standby_state() {
         IFS= read -r s < "$LEGACY_DATA/state.json"
     fi
     case "$s" in "{"*) ;; *) s="{\"time\":$(date +%s),\"tweaks\":{}}" ;; esac
-    print -r -- "{\"standby\":\"kia.tweaks\",${s#\{}" > $DATA/state.json.tmp
-    chmod 644 $DATA/state.json.tmp
-    mv $DATA/state.json.tmp $DATA/state.json
+    print -r -- "{\"standby\":\"kia.tweaks\",${s#\{}" > "$DATA/state.json.tmp"
+    chmod 644 "$DATA/state.json.tmp"
+    mv "$DATA/state.json.tmp" "$DATA/state.json"
 }
 
 # ends a round: the test hook, then sleep in the background so a stop signal is handled at once
 pause() {
     ROUND=$((ROUND + 1))
     if [ -n "$KT_TEST_ROUNDS" ] && [ $ROUND -ge "$KT_TEST_ROUNDS" ]; then stop_all; exit 0; fi
-    sleep $1 &
+    sleep "$1" &
     wait $!
 }
 
 # ---- main
 
-cd $DATA 2>/dev/null || cd /
-mkdir -p $WANT $RUN $LOGS $INDEX $SHADOW
-cd $DATA
+cd "$DATA" 2>/dev/null || cd /
+mkdir -p "$WANT" "$RUN" "$LOGS" "$INDEX" "$SHADOW"
+cd "$DATA" || cd /
 # /data/nemesis/cabinwright is shared with the other Cabinwright packages (the store)
-chmod 755 ${DATA%/*} $DATA
-chmod 700 $WANT $RUN $LOGS $INDEX $SHADOW
+chmod 755 "${DATA%/*}" "$DATA"
+chmod 700 "$WANT" "$RUN" "$LOGS" "$INDEX" "$SHADOW"
 log "starting (firmware $FIRMWARE)"
 # a run.sh left over from before an update runs the old script: restart it
 stop_all
@@ -642,7 +657,7 @@ trap 'log "stopping"; stop_all; exit 0' TERM INT HUP
 SELF=$(ls -l "$0")
 
 import_legacy
-LAST_READ=0 LAST_PROC= APP_READ= STANDBY= ROUND=0
+LAST_READ=0 LAST_PROC='' APP_READ='' STANDBY='' ROUND=0
 while :; do
     if [ "$(ls -l "$0" 2>/dev/null)" != "$SELF" ] && [ -f "$0" ]; then
         log "tweaksd.sh changed; restarting with the new one"
@@ -658,7 +673,7 @@ while :; do
         fi
         import_legacy
         standby_state
-        pause $SLOW
+        pause "$SLOW"
         continue
     fi
     [ -n "$STANDBY" ] && log "kia.tweaks' tweaksd has stopped; taking over"
@@ -669,7 +684,7 @@ while :; do
     CHANGED=
     # read when the app is in front, has just left it, has (re)started, or now and then
     if [ "${proc#* }" = fg ] || [ "${LAST_PROC#* }" = fg ] || { [ -n "$proc" ] && [ "${proc% *}" != "${LAST_PROC% *}" ]; } \
-            || { [ -n "$proc" ] && [ $((now - LAST_READ)) -ge $REREAD ]; } || [ -z "$(ls $WANT)" ]; then
+            || { [ -n "$proc" ] && [ $((now - LAST_READ)) -ge $REREAD ]; } || [ -z "$(ls "$WANT")" ]; then
         if read_desired; then
             [ -n "$APP_READ" ] || log "reading switches from the Tweaks app"
             APP_READ=1 LAST_READ=$now
@@ -715,5 +730,5 @@ while :; do
     done
     write_state
     [ "${proc#* }" = fg ] && n=$FAST || n=$SLOW
-    pause $n
+    pause "$n"
 done
