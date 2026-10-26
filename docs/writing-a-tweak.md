@@ -86,8 +86,9 @@ replays that record backwards, so most tweaks need no undo code at all.
 `binder`, `kill`, `service` and `root` steps leave nothing to restore, so a tweak that uses
 them for a lasting change must ship `disable.sh` (CI checks), oneshot or service. Turning off
 runs, in order: the service's `run.sh` is stopped, `disable.sh` runs, then the record is
-replayed. If off should deliberately leave such a change in place, `disable.sh` says so in a
-comment and does nothing (as `auto-dst`'s does: turning it off leaves the clock as it is).
+replayed. If off should deliberately leave a change in place, `disable.sh` says why in a
+comment, and for a recorded value calls `kt keep <need>` so the replay leaves it too (as
+`auto-dst`'s does: turning it off leaves the clock and its settings checkbox as they are).
 
 `status.sh` should describe the car, not the script: check the actual files or values. Without
 one the runner reports from its record.
