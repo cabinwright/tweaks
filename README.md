@@ -39,6 +39,5 @@ needs the car's stock SystemUI and `bsdiff4==1.3.1` (see `systemui/build.sh`).
 
 ## License
 
-AGPL-3.0-or-later (see `LICENSE`), Copyright (c) 2026 hazptr. Tweaks ported from
-[HMG Leafia Plus](https://github.com/VysseCodes/HMG-Leafia-Plus) (GPL-3.0) and from NEMESIS
-community packages (AGPL-3.0) keep their authors' notices; see `NOTICE.md`.
+MIT (see `LICENSE`), Copyright (c) 2026 hazptr. Tweaks ported from HMG Leafia Plus and
+other community packages ship separately as tweak packs, under their own licenses.
