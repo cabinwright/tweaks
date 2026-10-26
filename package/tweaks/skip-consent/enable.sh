@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # Install the patched SystemUI (see common.sh). Never reboots; exit 0 = installed.
 D=${0%/*}
-. $D/common.sh
+. "$D/common.sh"
 
 if is_ours; then echo "already on"; exit 0; fi
 
@@ -10,16 +10,16 @@ if backup_ok $B; then
     echo "stock backup present"
 elif backup_ok $LEGACY_B; then
     # tweaksd normally copies it when it imports kia.tweaks' data; left as it is there
-    mkdir -p $B && cp $LEGACY_B/SystemUI.apk $LEGACY_B/SystemUI.odex $B/ || fail "copy backup"
+    { mkdir -p $B && cp $LEGACY_B/SystemUI.apk $LEGACY_B/SystemUI.odex $B/; } || fail "copy backup"
     backup_ok $B || fail "backup copy doesn't match stock"
     echo "copied stock backup from $LEGACY_B"
 elif backup_ok $OLD_B; then
-    mkdir -p $B && cp $OLD_B/SystemUI.apk $OLD_B/SystemUI.odex $B/ || fail "copy backup"
+    { mkdir -p $B && cp $OLD_B/SystemUI.apk $OLD_B/SystemUI.odex $B/; } || fail "copy backup"
     backup_ok $B || fail "backup copy doesn't match stock"
     rm -rf $OLD_B
     echo "moved stock backup from $OLD_B"
 elif is_stock; then
-    mkdir -p $B && cp $APP/SystemUI.apk $APP/SystemUI.odex $B/ || fail "backup copy"
+    { mkdir -p $B && cp $APP/SystemUI.apk $APP/SystemUI.odex $B/; } || fail "backup copy"
     backup_ok $B || fail "backup doesn't match stock"
     echo "backed up stock SystemUI to $B"
 else
@@ -27,8 +27,8 @@ else
 fi
 
 # 2. rebuild the patched apk from the backup; the tool checks the delta's md5s itself
-rm -rf $WORK && mkdir -p $WORK/data/dalvik-cache || fail "mkdir $WORK"
-kp delta $D/systemui.lpd $B/SystemUI.odex $WORK/classes.dex || fail "rebuilding the patched code"
+{ rm -rf $WORK && mkdir -p $WORK/data/dalvik-cache; } || fail "mkdir $WORK"
+kp delta "$D/systemui.lpd" $B/SystemUI.odex $WORK/classes.dex || fail "rebuilding the patched code"
 kp zipadd $B/SystemUI.apk $WORK/classes.dex $WORK/SystemUI.apk || fail "packing the apk"
 [ "$(sum $WORK/SystemUI.apk)" = $SUM_OURS ] || fail "rebuilt apk isn't the expected one"
 

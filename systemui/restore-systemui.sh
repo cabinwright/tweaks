@@ -14,7 +14,7 @@ SUM_ODEX=8abb72b9715bc8e4746ac9ee3b03ab39
 L=/storage/usb0/systemui-restore.log
 log() { echo "$(date) $1" >> $L; }
 
-sum() { md5 "$1" 2>/dev/null | while read -r s f; do echo "$s"; done; }
+sum() { md5 "$1" 2>/dev/null | while read -r s _; do echo "$s"; done; }
 
 log "restore start"
 if [ "$(sum $B/SystemUI.apk)" != $SUM_APK ] || [ "$(sum $B/SystemUI.odex)" != $SUM_ODEX ]; then

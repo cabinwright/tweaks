@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # One line: on|off|error <text>
 D=${0%/*}
-. $D/common.sh
+. "$D/common.sh"
 
 if is_ours; then
     pending && echo "on restart the head unit to apply" || echo "on start-up screen skipped"

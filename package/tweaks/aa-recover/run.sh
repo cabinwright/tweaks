@@ -40,7 +40,7 @@ while :; do
             [ $((_now - _last)) -gt $GAP ] && { _n=0; _first=$_now; }
             _last=$_now
             _n=$((_n + 1))
-            [ $_n -ge $HITS ] && [ $((_now - _first)) -ge $SPAN ] || continue
+            { [ $_n -ge $HITS ] && [ $((_now - _first)) -ge $SPAN ]; } || continue
             _pid=$(sink_pid)
             if [ -n "$_pid" ] && restart_sink "$_pid"; then
                 log "receiver stuck ($_n stuck lines in $((_now - _first)) s) - restarted it (pid $_pid)"

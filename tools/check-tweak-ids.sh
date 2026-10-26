@@ -53,5 +53,5 @@ for tag in $tags; do
         [ "$kind" = "$okind" ] || err "$id was kind=$okind in $tag and is kind=$kind now: give it a new id"
     done
 done
-[ $fail = 0 ] && echo "check-tweak-ids: ok ($(echo $tags | wc -w | tr -d ' ') releases)"
+[ $fail = 0 ] && echo "check-tweak-ids: ok ($(echo "$tags" | wc -w | tr -d ' ') releases)"
 exit $fail
