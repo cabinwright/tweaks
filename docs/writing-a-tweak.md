@@ -13,7 +13,7 @@ tweaks/<id>/
     tweak.conf             what it is and what it needs
     run.sh                 kind=service: runs while the switch is on
     enable.sh              kind=oneshot: apply (exit 0 = done; must be safe to run again)
-    disable.sh             kind=oneshot, optional: undo what the journal can't (see below)
+    disable.sh             undo what the journal can't (see below)
     status.sh              optional: prints one line, "on|off|error <short text>"
 lib/                       shared files (this package: tweakpatch.jar)
 ```
@@ -83,9 +83,11 @@ The runner records every `kt` change before it happens: the original file (in it
 the previous property or setting value. Turning a tweak off, removing its pack, or safe mode
 replays that record backwards, so most tweaks need no undo code at all.
 
-`binder`, `kill`, `service` and `root` steps leave nothing to restore. A oneshot tweak that
-uses them for a lasting change must ship `disable.sh` (CI checks). A service tweak is stopped
-when it is turned off; whatever its `kt` steps changed is then put back from the record.
+`binder`, `kill`, `service` and `root` steps leave nothing to restore, so a tweak that uses
+them for a lasting change must ship `disable.sh` (CI checks), oneshot or service. Turning off
+runs, in order: the service's `run.sh` is stopped, `disable.sh` runs, then the record is
+replayed. If off should deliberately leave such a change in place, `disable.sh` says so in a
+comment and does nothing (as `auto-dst`'s does: turning it off leaves the clock as it is).
 
 `status.sh` should describe the car, not the script: check the actual files or values. Without
 one the runner reports from its record.

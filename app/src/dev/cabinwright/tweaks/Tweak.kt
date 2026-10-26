@@ -22,8 +22,8 @@ internal class Tweak private constructor(o: JSONObject) {
     val needs: List<Need> = needs(o.optJSONArray("needs"))
     val firmwareOk: Boolean = o.optBoolean("firmware_ok", true)
 
-    /** The tweak's firmware= line, when the runner sends it. */
-    val firmware: String = o.optString("firmware")
+    /** The firmware versions the tweak is made for (its firmware= line; "*" for any). */
+    val firmware: List<String> = strings(o.optJSONArray("firmware"))
     val desired: Boolean = o.optBoolean("desired")
 
     /** on, off, error or working; "" before the runner has a state for it. */
@@ -33,7 +33,7 @@ internal class Tweak private constructor(o: JSONObject) {
     val text: String = o.optString("text").trimSpaces()
 
     /** Paused by safe mode. */
-    val safeMode: Boolean = o.optBoolean("safe_mode")
+    val paused: Boolean = o.optBoolean("paused")
 
     /** Any `file:` need: it changes system files, so the app asks before switching it. */
     fun changesFiles(): Boolean = needs.any { it.what.startsWith("file:") }
@@ -42,13 +42,9 @@ internal class Tweak private constructor(o: JSONObject) {
         /** This app's own package in the store, which also holds the base tweaks. */
         const val OWN = "cabinwright.tweaks"
 
-        /** The tweaks in a `tweaks/list` reply: an array, or an object with a "tweaks" array. */
-        fun list(data: Any?): List<Tweak> {
-            val a = when (data) {
-                is JSONArray -> data
-                is JSONObject -> data.optJSONArray("tweaks")
-                else -> null
-            } ?: return emptyList()
+        /** The tweaks in a `tweaks/list` reply, `{tweaks: [...], safe_mode}`. */
+        fun list(data: JSONObject?): List<Tweak> {
+            val a = data?.optJSONArray("tweaks") ?: return emptyList()
             val out = ArrayList<Tweak>()
             for (i in 0 until a.length()) {
                 val o = a.optJSONObject(i) ?: continue
@@ -58,28 +54,21 @@ internal class Tweak private constructor(o: JSONObject) {
             return out
         }
 
-        /** Safe mode is on: a reply that says so at the top, or any tweak it paused. */
-        fun safeMode(data: Any?, tweaks: List<Tweak>): Boolean =
-            (data as? JSONObject)?.optBoolean("safe_mode") == true || tweaks.any { it.safeMode }
-
-        /** Each need is "need | reason" as in tweak.conf, or {"need", "reason"}. */
+        /** needs: `[{need, reason}]`. */
         private fun needs(a: JSONArray?): List<Need> {
             if (a == null) return emptyList()
             val out = ArrayList<Need>()
             for (i in 0 until a.length()) {
-                val o = a.optJSONObject(i)
-                if (o != null) {
-                    out.add(Need(o.optString("need"), o.optString("reason")))
-                    continue
-                }
-                val s = a.optString(i)
-                val bar = s.indexOf('|')
-                if (bar < 0) {
-                    out.add(Need(s.trimSpaces(), ""))
-                } else {
-                    out.add(Need(s.substring(0, bar).trimSpaces(), s.substring(bar + 1).trimSpaces()))
-                }
+                val o = a.optJSONObject(i) ?: continue
+                out.add(Need(o.optString("need"), o.optString("reason")))
             }
+            return out
+        }
+
+        private fun strings(a: JSONArray?): List<String> {
+            if (a == null) return emptyList()
+            val out = ArrayList<String>()
+            for (i in 0 until a.length()) out.add(a.optString(i))
             return out
         }
 

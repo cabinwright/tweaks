@@ -343,7 +343,7 @@ class TweaksActivity : CarPage() {
         val want = isChecked(t)
         return when {
             !t.firmwareOk -> Look("Not available", IDLE)
-            t.safeMode -> Look("Paused", WARN)
+            t.paused -> Look("Paused", WARN)
             t.state == "working" -> Look("Applying…", WARN)
             t.state == "error" -> Look("Problem", BAD)
             t.state != (if (want) "on" else "off") -> Look(if (want) "Turning on…" else "Turning off…", WARN)
@@ -389,10 +389,10 @@ class TweaksActivity : CarPage() {
         panel.addView(desc)
 
         if (!t.firmwareOk) {
-            val made = if (t.firmware.isEmpty()) "another head unit software version" else t.firmware.replace(",", ", ")
+            val made = if (t.firmware.isEmpty()) "another head unit software version" else t.firmware.joinToString(", ")
             panel.addView(fact("Made for $made; this head unit runs ${Tweak.firmware()}."))
         }
-        if (t.safeMode) panel.addView(fact("Paused by safe mode. Resume system tweaks in the store."))
+        if (t.paused) panel.addView(fact("Paused by safe mode. Resume system tweaks in the store."))
         showSetResult(t)
         showNeeds(t)
         showLog(t)
@@ -484,20 +484,16 @@ class TweaksActivity : CarPage() {
     }
 
     /**
-     * The store app's page for [pkg] (a store package id), where the driver agrees to what it
-     * needs; with no package, the store's main page, which offers to resume after safe mode.
+     * The store app's page for [pkg] (a NEMESIS package id), where the driver agrees to what it
+     * needs; with no package, the store's main page, which shows the safe mode
+     * notice and offers to resume.
      */
     private fun openStore(pkg: String?) {
-        val i = if (pkg == null) {
-            packageManager.getLaunchIntentForPackage(STORE_APP)
-        } else {
-            Intent(SHOW_APP).setPackage(STORE_APP).putExtra("package", pkg)
-        }
+        val i = Intent(SHOW_APP).setPackage(STORE_APP)
+        if (pkg != null) i.putExtra("package", pkg)
         try {
-            if (i != null) {
-                startActivity(i)
-                return
-            }
+            startActivity(i)
+            return
         } catch (ignored: ActivityNotFoundException) {
         }
         Toast.makeText(this, "The Cabinwright store app isn't installed.", Toast.LENGTH_LONG).show()

@@ -28,14 +28,15 @@ internal class Snapshot(
             if (hello != null && hello.grants[CarBroker.TWEAKS] == "off") return failed(CarBroker.NOT_GRANTED, null)
             val r = CarBroker.call(CarBroker.TWEAKS, "list")
             if (!r.ok) return failed(r.error, r.message)
-            val tweaks = Tweak.list(r.data)
+            val data = r.data as? JSONObject
+            val tweaks = Tweak.list(data)
             val lines = ArrayList<String>()
             if (logId != null && tweaks.any { it.id == logId }) {
                 val l = CarBroker.call(CarBroker.TWEAKS, "log", JSONObject().put("id", logId))
                 val a = if (l.ok) (l.data as? JSONObject)?.optJSONArray("lines") ?: l.data as? JSONArray else null
                 if (a != null) for (i in 0 until a.length()) lines.add(a.optString(i))
             }
-            return Snapshot(true, tweaks, Tweak.safeMode(r.data, tweaks), null, null, logId, lines)
+            return Snapshot(true, tweaks, data?.optBoolean("safe_mode") == true, null, null, logId, lines)
         }
 
         private fun failed(error: String?, message: String?): Snapshot {
