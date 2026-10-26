@@ -14,7 +14,7 @@ CHECK=5   # seconds between checks
 
 log() { echo "$(date) $1"; }
 # last action, shown in the Tweaks app (status.sh)
-last() { mkdir -p /data/nemesis/kia-tweaks/last && echo "$(date +%s) $1" > /data/nemesis/kia-tweaks/last/eth0-guard; }
+last() { mkdir -p /data/nemesis/cabinwright/tweaks/last && echo "$(date +%s) $1" > /data/nemesis/cabinwright/tweaks/last/eth0-guard; }
 
 eth0_clashes() {
     netcfg 2>/dev/null | while read -r _if _state _addr _rest; do

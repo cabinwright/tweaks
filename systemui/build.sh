@@ -1,9 +1,9 @@
 #!/bin/sh
 # Builds the skip-consent delta: a classes.dex with the consent-screen patch (patch.py),
 # stored as a delta against the car's stock SystemUI.odex, so the tweak rebuilds it on the
-# car from the car's own file (tweaks/skip-consent/enable.sh) and nothing of Kia's ships.
-# On the car the dex is added to the stock SystemUI.apk, untouched (Kia's signed manifest and
-# resources); as with the kia-menu launcher, only the manifest is signature-checked for
+# car from the car's own file (tweaks/skip-consent/enable.sh) and nothing of the head unit's ships.
+# On the car the dex is added to the stock SystemUI.apk, untouched (the head unit's signed manifest and
+# resources); as with the Cabinwright launcher hook, only the manifest is signature-checked for
 # /system apps on this firmware.
 #
 # usage: systemui/build.sh <stock dir> [out.lpd]

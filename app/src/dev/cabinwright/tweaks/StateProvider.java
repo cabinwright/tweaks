@@ -1,4 +1,4 @@
-package dev.kiatweaks;
+package dev.cabinwright.tweaks;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;
@@ -10,13 +10,13 @@ import android.os.Process;
 import android.util.Log;
 
 /**
- * content://dev.kiatweaks.state/desired: rows (id, on, gen), read by tweaksd with the stock
+ * content://dev.cabinwright.tweaks.state/desired: rows (id, on, gen), read by tweaksd with the stock
  * `content query` command. Read-only, and only for root (tweaksd), system, shell (adb) and
  * the app itself, so no other app can learn or, worse, set what tweaksd does. A tweak with
  * nothing to go on yet (see TweakStore.desired) has no row: tweaksd leaves it alone.
  */
 public class StateProvider extends ContentProvider {
-    static final String TAG = "KiaTweaks";
+    static final String TAG = "CabinwrightTweaks";
     private static final int SHELL_UID = 2000; // Process.SHELL_UID is hidden on API 19
 
     @Override

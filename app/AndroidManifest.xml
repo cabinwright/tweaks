@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="dev.kiatweaks"
-    android:versionCode="4"
-    android:versionName="1.3">
+    package="dev.cabinwright.tweaks"
+    android:versionCode="5"
+    android:versionName="1.4">
 
     <uses-sdk android:minSdkVersion="19" android:targetSdkVersion="19" />
     <!-- keeps a copy of the switches on the sdcard, since package updates wipe app data -->
@@ -14,26 +14,26 @@
         android:allowBackup="false">
         <activity
             android:name=".TweaksActivity"
-            android:theme="@style/KiaTheme"
+            android:theme="@style/CarTheme"
             android:screenOrientation="landscape"
             android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- shows this app in Kia's All Menus (kia-menu launcher hook) -->
+            <!-- shows this app in All Menus (Cabinwright launcher hook) -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <category android:name="dev.kiamenu.category.ALL_MENUS" />
+                <category android:name="dev.cabinwright.category.ALL_MENUS" />
             </intent-filter>
-            <meta-data android:name="dev.kiamenu.icon" android:resource="@drawable/menu_icon" />
-            <meta-data android:name="dev.kiamenu.icon_disabled" android:resource="@drawable/menu_icon_dis" />
+            <meta-data android:name="dev.cabinwright.icon" android:resource="@drawable/menu_icon" />
+            <meta-data android:name="dev.cabinwright.icon_disabled" android:resource="@drawable/menu_icon_dis" />
         </activity>
 
         <!-- tweaksd reads the switches here with `content query` (root, system and shell only) -->
         <provider
             android:name=".StateProvider"
-            android:authorities="dev.kiatweaks.state"
+            android:authorities="dev.cabinwright.tweaks.state"
             android:exported="true" />
     </application>
 </manifest>

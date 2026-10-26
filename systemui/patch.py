@@ -3,7 +3,7 @@
 See docs/consent-screen.md for the names.
 
 ConsentScreenUI.start() (consentscreen/D) builds the screen at boot unless factory mode is
-on or the welcome screen goes first; in both of those cases Kia's code calls dc() instead,
+on or the welcome screen goes first; in both of those cases the head unit's code calls dc() instead,
 which records the agreement (sys.boot.enabled_screen / confirm_screen, broadcast
 AGREE_USER_LICENSE) without any screen. The hook makes the normal boot path do the same.
 The current driver stays as it was. Every other way the screen opens (choosing a driver
@@ -21,6 +21,9 @@ ANCHOR = ("    :cond_14d\n"
           "\n"
           "    goto/16 :goto_7d\n"
           ".end method\n" % D)
+# The log line keeps the project's old name: it is inside the shipped delta (systemui.lpd)
+# and the checksum of the patched SystemUI (SUM_OURS), which cars already run. Changing it
+# would need a new delta built from the car's stock files and a new checksum.
 HOOK = ("    :cond_14d\n"
         "    invoke-direct {p0}, %s->dc()V\n"
         "    const-string v1, \"ConsentScreenUI\"\n"

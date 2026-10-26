@@ -1,14 +1,14 @@
 [nemesis]
-version=1.3
-id=kia.tweaks
-name=Kia tweaks
+version=1.4
+id=cabinwright.tweaks
+name=Tweaks
 types=application,service
 
 [app.0]
 kind=apk
-path=app/kia-tweaks.apk
-package=dev.kiatweaks
-component=dev.kiatweaks/.TweaksActivity
+path=app/tweaks.apk
+package=dev.cabinwright.tweaks
+component=dev.cabinwright.tweaks/.TweaksActivity
 
 [service.0]
 name=tweaksd

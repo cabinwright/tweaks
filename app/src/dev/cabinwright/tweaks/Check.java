@@ -1,4 +1,4 @@
-package dev.kiatweaks;
+package dev.cabinwright.tweaks;
 
 import android.content.Context;
 import android.graphics.Canvas;
@@ -7,10 +7,10 @@ import android.graphics.Path;
 import android.graphics.RectF;
 import android.view.View;
 
-import dev.kiamenu.api.ui.KiaPage;
+import dev.cabinwright.api.ui.CarPage;
 
 /**
- * Kia's list checkbox (Setup > General > Date & Time): a rounded teal square with a check
+ * The head unit's list checkbox (Setup > General > Date & Time): a rounded teal square with a check
  * cut out in the page colour, an outlined square when off. Colours measured from the stock
  * screen in each mode.
  */
@@ -26,7 +26,7 @@ final class Check extends View {
 
     Check(Context context, int emptyColor) {
         super(context);
-        boolean night = KiaPage.isNight(context);
+        boolean night = CarPage.isNight(context);
         fill = night ? 0xFF176972 : 0xFF40CABE;
         cut = night ? 0xFF161618 : 0xFFFFFFFF;
         edge = night ? 0xFF4A4F55 : 0xFFB0B4B6;

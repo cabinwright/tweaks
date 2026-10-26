@@ -1,11 +1,12 @@
 #!/system/bin/sh
-# Rescue: restore Kia's stock SystemUI from the skip-consent tweak's backup, then reboot.
+# Rescue: restore the stock SystemUI from the skip-consent tweak's backup, then reboot.
 # For when the head unit can't reach the Tweaks app; normally the tweak's own switch does
 # this. Run from the USB stick (NEMESIS.data type=execute), which runs with full root.
 # Log: systemui-restore.log on the stick.
 export PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
 export LD_LIBRARY_PATH=/vendor/lib:/system/lib
-B=/data/nemesis/backup/kia-tweaks.systemui
+B=/data/nemesis/backup/cabinwright.tweaks.systemui
+[ -d $B ] || B=/data/nemesis/backup/kia-tweaks.systemui   # kia.tweaks, before the move to Cabinwright
 [ -d $B ] || B=/data/nemesis/backup/ev6.systemui   # earlier test install
 APP=/system/priv-app
 SUM_APK=512fa1835649e710d91deeb37c90433d

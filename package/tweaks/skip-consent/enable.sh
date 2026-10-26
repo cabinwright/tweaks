@@ -8,6 +8,11 @@ if is_ours; then echo "already on"; exit 0; fi
 # 1. stock backup, taken once and only from the stock files
 if backup_ok $B; then
     echo "stock backup present"
+elif backup_ok $LEGACY_B; then
+    # tweaksd normally copies it when it imports kia.tweaks' data; left as it is there
+    mkdir -p $B && cp $LEGACY_B/SystemUI.apk $LEGACY_B/SystemUI.odex $B/ || fail "copy backup"
+    backup_ok $B || fail "backup copy doesn't match stock"
+    echo "copied stock backup from $LEGACY_B"
 elif backup_ok $OLD_B; then
     mkdir -p $B && cp $OLD_B/SystemUI.apk $OLD_B/SystemUI.odex $B/ || fail "copy backup"
     backup_ok $B || fail "backup copy doesn't match stock"

@@ -6,7 +6,7 @@
 # session port: the phone joins the hotspot, times out, and retries every ~3.5 s
 # until the receiver restarts. Killing the receiver (a persistent app, so Android
 # starts it again at once) clears it, and the phone connects on its next try.
-# A kia-tweaks service tweak: tweaksd keeps this running while the switch is on.
+# A Tweaks service tweak: tweaksd keeps this running while the switch is on.
 export PATH=/data/nemesis/bin:/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
 SINK=com.google.android.projection.sink
 HITS=6        # stuck lines before acting: two or three per retry, so about three retries
@@ -16,7 +16,7 @@ COOLDOWN=120  # seconds to leave the receiver alone after a restart
 
 log() { echo "$(date) $1"; }
 # last action, shown in the Tweaks app (status.sh)
-last() { mkdir -p /data/nemesis/kia-tweaks/last && echo "$(date +%s) $1" > /data/nemesis/kia-tweaks/last/aa-recover; }
+last() { mkdir -p /data/nemesis/cabinwright/tweaks/last && echo "$(date +%s) $1" > /data/nemesis/cabinwright/tweaks/last/aa-recover; }
 
 sink_pid() {
     ps | while read -r _u _p _rest; do

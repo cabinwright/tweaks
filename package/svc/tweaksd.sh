@@ -1,8 +1,8 @@
 #!/system/bin/sh
-# tweaksd: turns tweaks on and off as the Tweaks app (dev.kiatweaks) says: its own in
+# tweaksd: turns tweaks on and off as the Tweaks app (dev.cabinwright.tweaks) says: its own in
 # ../tweaks/<id>/, and those of tweak packs, other NEMESIS packages with a tweaks/<id>/ folder
 # (/data/nemesis/apps/<package>/tweaks/<id>/). An id belongs to the first package that has
-# it, kia.tweaks first and then by package id; a clash is logged and the later one skipped.
+# it, cabinwright.tweaks first and then by package id; a clash is logged and the later one skipped.
 #
 # Nothing a package leaves behind is stranded, and packages need no install hooks (NEMESIS
 # runs a package's uninstall hooks on every update too, and they can't tell the two apart):
@@ -21,7 +21,7 @@
 #   as "orphan" instead of being forgotten.
 #
 # The app is the only writer of the desired state; it serves it read-only at
-# content://dev.kiatweaks.state/desired, rows "id=<id>, on=0|1, gen=<n>" (gen changes on
+# content://dev.cabinwright.tweaks.state/desired, rows "id=<id>, on=0|1, gen=<n>" (gen changes on
 # every switch). Reading through the provider rather than a file means no other app can flip
 # a tweak: the provider only answers uid 0/1000/2000 and the app itself.
 #
@@ -36,23 +36,38 @@
 # and not at all while it isn't running. The last state read is kept in $WANT, so tweaks
 # come back at boot before the app is up.
 #
-# Writes $DATA/state.json (world-readable; the app reads it) and a copy in /sdcard/kia-tweaks.
+# Writes $DATA/state.json (world-readable; the app reads it) and a copy in /sdcard/cabinwright/tweaks.
 # Tweak output goes to $DATA/logs/<id>.log.
+#
+# Moving from kia.tweaks (this package's name before 1.4), installed side by side for the switch:
+# - while kia.tweaks' tweaksd runs, this one stands by: it runs no tweak script and reads no
+#   switches, so two runners never drive the same tweaks. Its state.json is then kia.tweaks'
+#   own, marked "standby".
+# - with no data of its own yet, it imports kia.tweaks' (read only, never written): the switches
+#   (want/, gen), state.json, the pack copies (shadow/), logs/, last/, skip-consent's pending
+#   mark, and the skip-consent stock backup. Until it first acts the import follows
+#   kia.tweaks' state; after that it never runs again ($DATA/imported says so).
+# - once kia.tweaks is removed, its tweaks continue here: a removed package's tweak that
+#   another installed package provides (this one's own, or a pack's) is never turned off.
+#
+# KT_TEST_ROOT, KT_TEST_PATH, KT_TEST_ROUNDS, KT_TEST_SLEEP: host tests only (tests/tweaksd-test.sh).
 export PATH=/data/nemesis/bin:/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
 umask 022   # NEMESIS starts services with umask 0
+R=${KT_TEST_ROOT:-}
+[ -n "$R" ] && PATH=$KT_TEST_PATH:$PATH
 HERE=${0%/*}   # no dirname on the car
 TWEAKS=${HERE%/*}/tweaks
-DATA=/data/nemesis/kia-tweaks
+DATA=$R/data/nemesis/cabinwright/tweaks
 WANT=$DATA/want   # <id>: 1 or 0, as last read from the app
 RUN=$DATA/run     # <id>.pid .state .text .since .error .failed .status .checked
 INDEX=$DATA/index # <id>: the tweak's folder
-PACKS=/data/nemesis/apps
+PACKS=$R/data/nemesis/apps
 SHADOW=$DATA/shadow   # <package>/: a copy of each tweak pack; <package>.missing: since when it's gone
 DEPART_AFTER=60
 LOGS=$DATA/logs
-SD=/sdcard/kia-tweaks
-URI=content://dev.kiatweaks.state/desired
-APP=dev.kiatweaks
+SD=/sdcard/cabinwright/tweaks
+URI=content://dev.cabinwright.tweaks.state/desired
+APP=dev.cabinwright.tweaks
 FIRMWARE=$(getprop ro.build.product)
 FAST=3          # seconds between rounds while the app is in the foreground
 SLOW=15         # otherwise
@@ -60,6 +75,12 @@ REREAD=300      # re-read the app's state this often while it runs in the backgr
 RECHECK=300     # oneshot status.sh can be slow (checksums), so it runs on changes and this often
 RETRY=60        # wait before restarting a run.sh that died
 LOG_MAX=32768
+# kia.tweaks: its tweaksd's command line, its data and the skip-consent backup (all read only)
+LEGACY_SVC=/data/nemesis/apps/kia.tweaks/svc/tweaksd.sh
+LEGACY_DATA=$R/data/nemesis/kia-tweaks
+LEGACY_BACKUP=$R/data/nemesis/backup/kia-tweaks.systemui
+BACKUP=$R/data/nemesis/backup/cabinwright.tweaks.systemui
+if [ -n "$R" ]; then FAST=${KT_TEST_SLEEP:-$FAST} SLOW=${KT_TEST_SLEEP:-$SLOW} DEPART_AFTER=${KT_TEST_DEPART_AFTER:-$DEPART_AFTER}; fi
 CR=$(print '\r')
 
 log() { print -r -- "$(date) $1"; }
@@ -349,7 +370,7 @@ pkg_of() { local p=${1%/tweaks/*}; print -r -- "${p##*/}"; }
 nemesis_busy() {
     local f
     # cmdline separates arguments with NULs, which the shell can't hold: grep the file
-    for f in /proc/[0-9]*/cmdline; do
+    for f in $R/proc/[0-9]*/cmdline; do
         grep -q nemesis "$f" 2>/dev/null && grep -q install "$f" 2>/dev/null && return 0
     done
     return 1
@@ -421,7 +442,7 @@ clear_of_conflicts() {
     return 1
 }
 
-# rebuilds $INDEX: every tweak folder of kia.tweaks and the installed tweak packs, then the
+# rebuilds $INDEX: every tweak folder of cabinwright.tweaks and the installed tweak packs, then the
 # tweaks of removed packs (from their copies, marked departed) until they are off.
 index_tweaks() {
     local d id own seen= f gone p v
@@ -436,8 +457,15 @@ index_tweaks() {
         case "$id" in ""|*[!a-z0-9-]*) continue ;; esac
         case " $seen " in
             *" $id "*)
-                [ "$(pkg_of "$d")" = "$(pkg_of "$TWEAKS/x")" ] || \
-                    [ -n "$(get "$id" clash)" ] || { put "$id" clash 1; log "$id: also in $(pkg_of "$d"), skipped"; }
+                # a removed package's tweak that an installed package provides too isn't
+                # departed: it continues from that package and stays as it is
+                case "$d" in
+                    "$SHADOW"/*) [ "$(get "$id" continues)" = "$(pkg_of "$d")" ] || {
+                        put "$id" continues "$(pkg_of "$d")"
+                        log "$id: $(pkg_of "$d") was removed; $id continues from $(get "$id" pack)"; } ;;
+                    *) [ "$(pkg_of "$d")" = "$(pkg_of "$TWEAKS/x")" ] || \
+                        [ -n "$(get "$id" clash)" ] || { put "$id" clash 1; log "$id: also in $(pkg_of "$d"), skipped"; } ;;
+                esac
                 continue ;;
         esac
         seen="$seen $id"
@@ -477,19 +505,24 @@ index_tweaks() {
             log "$id: its package is gone"
         fi
     done
-    # a removed pack whose tweaks are all off (or never applied here): drop its copy
+    # a removed pack whose tweaks are all off (or never applied here), or continue from another
+    # package: drop its copy
     for p in $gone; do
         for d in "$p"/tweaks/*/; do
-            id=${d%/}; id=${id##*/}
+            d=${d%/}; id=${d##*/}
+            f=
+            [ -f "$INDEX/$id" ] && read -r f < "$INDEX/$id"
+            [ "$f" = "$d" ] || continue   # not run from this copy
             case "$(get "$id" state)" in on|working|error) continue 2 ;; esac
         done
         # its tweaks go with it, so they aren't run from the copy's folder once it's gone
         for d in "$p"/tweaks/*/; do
             d=${d%/}; id=${d##*/}
+            [ "$(get "$id" continues)" = "${p##*/}" ] && rm -f "$RUN/$id.continues"
             [ -f "$INDEX/$id" ] && read -r f < "$INDEX/$id" && [ "$f" = "$d" ] && rm -f "$INDEX/$id" "$RUN/$id".*
         done
         case "$p" in "$SHADOW"/[a-z0-9]*) rm -rf "$p" "$p.missing" ;; esac
-        log "${p##*/}: removed; its tweaks are off"
+        log "${p##*/}: removed; its tweaks are off or continue from another package"
     done
 }
 
@@ -502,11 +535,100 @@ stop_all() {
     done
 }
 
+# ---- moving from kia.tweaks
+
+# kia.tweaks' tweaksd is running (its command line names its script)
+legacy_running() {
+    local f
+    for f in $R/proc/[0-9]*/cmdline; do
+        grep -q "$LEGACY_SVC" "$f" 2>/dev/null && return 0
+    done
+    return 1
+}
+
+# copy_new <from> <to>: a copy of a file or folder where there is none yet
+copy_new() {
+    [ -e "$1" ] && [ ! -e "$2" ] || return 0
+    rm -rf "$2.tmp"
+    cp -R "$1" "$2.tmp" && mv "$2.tmp" "$2"
+}
+
+# Imports kia.tweaks' data (read only) while this tweaksd has none of its own. $DATA/imported
+# holds "started" during the first import, then the `ls -l` of the kia.tweaks state.json it
+# last followed, and "final" once this tweaksd has acted: after that it never imports again.
+import_legacy() {
+    local m st f first=
+    [ -d "$LEGACY_DATA" ] || return 0
+    m=$(cat "$DATA/imported" 2>/dev/null)
+    [ "$m" = final ] && return 0
+    # our own state without an import mark: this tweaksd ran before, nothing to import
+    [ -z "$m" ] && [ -f "$DATA/state.json" ] && return 0
+    st=$(ls -l "$LEGACY_DATA/state.json" 2>/dev/null)
+    case "$m" in "") first=1 ;; started) first=1 ;; "$st") return 0 ;; esac
+    [ -n "$first" ] && print started > "$DATA/imported"
+    # the switches as kia.tweaks' tweaksd last read them, and their generation
+    if [ -d "$LEGACY_DATA/want" ]; then
+        rm -rf "$WANT.tmp"
+        cp -R "$LEGACY_DATA/want" "$WANT.tmp" && rm -rf "$WANT" && mv "$WANT.tmp" "$WANT" && chmod 700 "$WANT"
+    fi
+    [ -f "$LEGACY_DATA/gen" ] && cp "$LEGACY_DATA/gen" "$DATA/gen"
+    [ -f "$LEGACY_DATA/skip-consent.pending" ] && cp "$LEGACY_DATA/skip-consent.pending" "$DATA/skip-consent.pending"
+    if [ -n "$first" ]; then
+        # the copies of the packs (so a pack removed meanwhile is still turned off), logs,
+        # the service tweaks' last actions, and skip-consent's stock SystemUI backup
+        for f in "$LEGACY_DATA"/shadow/*; do
+            [ -e "$f" ] && copy_new "$f" "$SHADOW/${f##*/}"
+        done
+        for f in "$LEGACY_DATA"/logs/*; do
+            [ -f "$f" ] && copy_new "$f" "$LOGS/${f##*/}"
+        done
+        copy_new "$LEGACY_DATA/last" "$DATA/last"
+        copy_new "$LEGACY_BACKUP" "$BACKUP" && [ -d "$BACKUP" ] && log "skip-consent backup: $BACKUP (copied from $LEGACY_BACKUP)"
+    fi
+    [ -f "$LEGACY_DATA/state.json" ] && [ ! -f "$DATA/state.json" ] && standby_state
+    print -r -- "${st:-none}" > "$DATA/imported"
+    if [ -n "$first" ]; then
+        log "imported kia.tweaks' data from $LEGACY_DATA (read only): switches $(ls "$WANT" | while read -r f; do print -n "$f=$(cat "$WANT/$f") "; done)"
+    fi
+}
+
+# this tweaksd acts from now on: a last import, then never again
+finish_import() {
+    local m
+    m=$(cat "$DATA/imported" 2>/dev/null)
+    [ -n "$m" ] && [ "$m" != final ] || return 0
+    import_legacy
+    print final > "$DATA/imported"
+    log "import from kia.tweaks done; running the tweaks from here"
+}
+
+# while standing by: kia.tweaks' state.json (root's, one line) is ours, marked "standby"
+standby_state() {
+    local s
+    if [ -f "$LEGACY_DATA/state.json" ]; then
+        IFS= read -r s < "$LEGACY_DATA/state.json"
+    fi
+    case "$s" in "{"*) ;; *) s="{\"time\":$(date +%s),\"tweaks\":{}}" ;; esac
+    print -r -- "{\"standby\":\"kia.tweaks\",${s#\{}" > $DATA/state.json.tmp
+    chmod 644 $DATA/state.json.tmp
+    mv $DATA/state.json.tmp $DATA/state.json
+}
+
+# ends a round: the test hook, then sleep in the background so a stop signal is handled at once
+pause() {
+    ROUND=$((ROUND + 1))
+    if [ -n "$KT_TEST_ROUNDS" ] && [ $ROUND -ge "$KT_TEST_ROUNDS" ]; then stop_all; exit 0; fi
+    sleep $1 &
+    wait $!
+}
+
 # ---- main
 
 cd $DATA 2>/dev/null || cd /
 mkdir -p $WANT $RUN $LOGS $INDEX $SHADOW
-chmod 755 $DATA
+cd $DATA
+# /data/nemesis/cabinwright is shared with the other Cabinwright packages (the store)
+chmod 755 ${DATA%/*} $DATA
 chmod 700 $WANT $RUN $LOGS $INDEX $SHADOW
 log "starting (firmware $FIRMWARE)"
 # a run.sh left over from before an update runs the old script: restart it
@@ -517,13 +639,29 @@ trap 'log "stopping"; stop_all; exit 0' TERM INT HUP
 # leaves the old script running: when the file changes, start over with the new one
 SELF=$(ls -l "$0")
 
-LAST_READ=0 LAST_PROC= APP_READ=
+import_legacy
+LAST_READ=0 LAST_PROC= APP_READ= STANDBY= ROUND=0
 while :; do
     if [ "$(ls -l "$0" 2>/dev/null)" != "$SELF" ] && [ -f "$0" ]; then
         log "tweaksd.sh changed; restarting with the new one"
         stop_all
         exec sh "$0"
     fi
+    # two runners must never drive the same tweaks: while kia.tweaks' tweaksd runs, stand by
+    if legacy_running; then
+        if [ -z "$STANDBY" ]; then
+            log "kia.tweaks' tweaksd is running ($LEGACY_SVC): standing by until it stops"
+            stop_all
+            STANDBY=1
+        fi
+        import_legacy
+        standby_state
+        pause $SLOW
+        continue
+    fi
+    [ -n "$STANDBY" ] && log "kia.tweaks' tweaksd has stopped; taking over"
+    STANDBY=
+    finish_import
     now=$(date +%s)
     proc=$(app_proc)
     CHANGED=
@@ -575,7 +713,5 @@ while :; do
     done
     write_state
     [ "${proc#* }" = fg ] && n=$FAST || n=$SLOW
-    # sleep in the background so a stop signal is handled at once
-    sleep $n &
-    wait $!
+    pause $n
 done

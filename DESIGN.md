@@ -1,17 +1,17 @@
-# kia-tweaks
+# Cabinwright tweaks
 
-Status: design, 2026-10-25. NEMESIS package `kia.tweaks`, published through the kia-apps store.
+Status: design, 2026-10-25. NEMESIS package `cabinwright.tweaks`, published through the Cabinwright store (cabinwright/apps index).
 
 One package of small, switchable head-unit tweaks, each with a plain description, a state, and
-an on/off switch in a **Tweaks** app (All Menus, kia-menu's `KiaPage` look). A tweak is a folder
+an on/off switch in a **Tweaks** app (All Menus, the Cabinwright API's `CarPage` look). A tweak is a folder
 of shell scripts; adding one is adding a folder. Other NEMESIS packages can bring tweaks of their
 own (tweak packs, below), shown and switched in the same app.
 
 ## Layout
 
 ```
-app/                       Tweaks app, package dev.kiatweaks (kia-menu build-app.sh --ui)
-package/NEMESIS.data       id=kia.tweaks; app.0 = the app; service.0 = tweaksd (uid root)
+app/                       Tweaks app, package dev.cabinwright.tweaks (menu repo's build-app.sh --ui)
+package/NEMESIS.data       id=cabinwright.tweaks; app.0 = the app; service.0 = tweaksd (uid root)
 package/svc/tweaksd.sh     the root service
 package/tweaks/<id>/
     tweak.conf             name=, summary=, description=, firmware= (exact strings, or *),
@@ -27,28 +27,28 @@ The first tweaks:
 
 | id | kind | What |
 |---|---|---|
-| `auto-dst` | service | Follows daylight saving time automatically (see `tweaks/auto-dst.sh`; Kia's own switch via TimePolicyService). Rule configurable later; US/Canada default. |
-| `skip-consent` | oneshot, risk=system, exact firmware | No start-up consent / driver-select screen: rebuilds SystemUI on the car from its own stock files (delta + checksums, nothing of Kia's shipped), backs up, installs; disable restores stock. Built by the owner; scripts and delta land in `tweaks/skip-consent/` later. |
+| `auto-dst` | service | Follows daylight saving time automatically (see `tweaks/auto-dst.sh`; the head unit's own switch via TimePolicyService). Rule configurable later; US/Canada default. |
+| `skip-consent` | oneshot, risk=system, exact firmware | No start-up consent / driver-select screen: rebuilds SystemUI on the car from its own stock files (delta + checksums, nothing of the head unit's shipped), backs up, installs; disable restores stock. Built by the owner; scripts and delta land in `tweaks/skip-consent/` later. |
 
 ## Who decides what's on
 
 The app is the only writer of the desired state. It keeps it in its own storage (mirrored to
-`/sdcard/kia-tweaks/desired.json` purely as a backup, since NEMESIS updates wipe app data) and
-exposes it read-only through a ContentProvider, `content://dev.kiatweaks.state/desired`, rows
+`/sdcard/cabinwright/tweaks/desired.json` purely as a backup, since NEMESIS updates wipe app data) and
+exposes it read-only through a ContentProvider, `content://dev.cabinwright.tweaks.state/desired`, rows
 `(id, on)`. The provider allows reads from uid 0 / 1000 / 2000 and the app itself; nothing
 can write through it. tweaksd reads it with the stock `content query` command, so another app
 on the car can't flip a tweak (an sdcard request file could be planted by any app; that matters
 here because `skip-consent` changes /system).
 
 tweaksd (root, `mode=restart`), every few seconds and on a broadcast from the app
-(`dev.kiatweaks.action.APPLY`; tweaksd can't receive broadcasts in sh, so it polls a cheap
+(`dev.cabinwright.tweaks.action.APPLY`; tweaksd can't receive broadcasts in sh, so it polls a cheap
 "generation" counter column in the same provider instead):
 
 1. read desired state; skip tweaks whose `firmware` doesn't match the car's
 2. `kind=service`: start `run.sh` (background, tracked pid) when on, stop it when off
 3. `kind=oneshot`: run `enable.sh` / `disable.sh` when desired differs from `status.sh`
    Every round turns tweaks off before it turns any on (see `replaces=` / `conflicts=`).
-4. write `/data/nemesis/kia-tweaks/state.json` *and* `/sdcard/kia-tweaks/state.json` (the app
+4. write `/data/nemesis/cabinwright/tweaks/state.json` *and* `/sdcard/cabinwright/tweaks/state.json` (the app
    can read the latter): per tweak `{state, text, last_change, last_error, log tail}`
 
 `risk=system` tweaks need a confirmation step in the app (what it changes, how to undo, that
@@ -57,13 +57,13 @@ the head unit reboots if needed) before the switch turns on.
 ## Tweak packs
 
 A tweak pack is any NEMESIS package with a `tweaks/` folder: `/data/nemesis/apps/<package>/tweaks/<id>/`,
-each folder exactly like one of kia.tweaks' own (`tweak.conf`, `status.sh`, `run.sh` or
+each folder exactly like one of cabinwright.tweaks' own (`tweak.conf`, `status.sh`, `run.sh` or
 `enable.sh` / `disable.sh`). Its `NEMESIS.data` needs only `[nemesis]` with `id=`, `version=`,
 `name=` (e.g. `types=application` with nothing else). Packs let tweaks ship under their own
 license and on their own schedule (tweaks ported from GPL/AGPL sources live in packs, not here).
 
-- tweaksd keeps `$INDEX` (`/data/nemesis/kia-tweaks/index/<id>`: the tweak's folder). Sources, in
-  order: kia.tweaks' own `tweaks/`, then each pack by package id. An id belongs to the first
+- tweaksd keeps `$INDEX` (`/data/nemesis/cabinwright/tweaks/index/<id>`: the tweak's folder). Sources, in
+  order: cabinwright.tweaks' own `tweaks/`, then each pack by package id. An id belongs to the first
   package that has it; a clash is logged and the later one skipped. The app lists tweaks the
   same way.
 - **A pack has no install hooks.** NEMESIS runs a package's `preuninstall` / `postuninstall` on
@@ -78,11 +78,15 @@ A package can go away while its tweaks are on, and an update can drop or rename 
 that may leave a change on the car that nothing can turn off any more.
 
 - **Shadow copies.** tweaksd copies every installed pack to
-  `/data/nemesis/kia-tweaks/shadow/<package>/`, and refreshes the copy when the pack's `version=`
+  `/data/nemesis/cabinwright/tweaks/shadow/<package>/`, and refreshes the copy when the pack's `version=`
   changes (not while a NEMESIS install is running, so a half-written pack isn't copied).
 - **pending.** When a pack's folder disappears, its tweaks are left exactly as they are and
   reported `"pending": true` while tweaksd waits to see whether it comes back: an update removes
   the package for a moment. The wait restarts while any `nemesis install` / `uninstall` runs.
+- **continuing.** A removed package's tweak whose id another installed package also provides
+  (cabinwright.tweaks itself, or another pack) isn't departed: it carries on from that package,
+  as it is, and the copy is dropped. This is what makes removing kia.tweaks (whose tweaks are all
+  cabinwright.tweaks' too) safe.
 - **departed.** After 60 s gone with no install running, the pack was removed: its tweaks are
   indexed from the shadow copy, reported `"departed": true`, and turned off with the copy's own
   scripts whatever the switch says. Once they are all off, the copy and their state go.
@@ -119,7 +123,7 @@ It also stops every run.sh at start, since one left over from before an update r
 
 Grid or list of tweaks: name, summary, state (with the status text), switch. Tapping opens the
 description and recent log. Shows plainly when tweaksd isn't running or a tweak doesn't support
-this firmware. Kia look via `KiaPage` (palette, Mobis font, day/night, slim title row).
+this firmware. The head unit's look via `CarPage` (palette, Mobis font, day/night, slim title row).
 
 ## Environment notes (Gen5W, Android 4.4)
 

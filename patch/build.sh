@@ -1,9 +1,9 @@
 #!/bin/sh
-# Builds the on-car patch tool (dev.kiatweaks.patch.Main) into a dex jar for app_process.
+# Builds the on-car patch tool (dev.cabinwright.tweaks.patch.Main) into a dex jar for app_process.
 # usage: patch/build.sh <out.jar>
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
-OUT=${1:-$HERE/build/kiapatch.jar}
+OUT=${1:-$HERE/build/tweakpatch.jar}
 case "$OUT" in /*) ;; *) OUT=$(pwd)/$OUT ;; esac
 SDK=${ANDROID_HOME:-$HOME/Library/Android/sdk}
 BUILD_TOOLS=${BUILD_TOOLS:-$SDK/build-tools/29.0.2}

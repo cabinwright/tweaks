@@ -1,18 +1,19 @@
 # Shared by enable.sh, disable.sh and status.sh (sourced; $D is this folder).
-# Kia's SystemUI asks for consent at every start; the patch (systemui/patch.py) makes
+# The head unit's SystemUI asks for consent at every start; the patch (systemui/patch.py) makes
 # ConsentScreenUI.start() record the agreement and skip building the screen. The patched
 # classes.dex is rebuilt here from the car's own stock SystemUI.odex (systemui.lpd), added to
-# the stock SystemUI.apk, and installed in its place; the stock pair is backed up first.
+# The stock SystemUI.apk, and installed in its place; the stock pair is backed up first.
 export PATH=/data/nemesis/bin:/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
 export LD_LIBRARY_PATH=/vendor/lib:/system/lib
 export ANDROID_ROOT=/system ANDROID_ASSETS=/system/app
 export BOOTCLASSPATH=/system/framework/core.jar:/system/framework/conscrypt.jar:/system/framework/okhttp.jar:/system/framework/core-junit.jar:/system/framework/bouncycastle.jar:/system/framework/ext.jar:/system/framework/framework.jar:/system/framework/framework2.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/mms-common.jar:/system/framework/android.policy.jar:/system/framework/services.jar:/system/framework/apache-xml.jar:/system/framework/webviewchromium.jar:/system/framework/automotive.jar
 APP=/system/priv-app
-B=/data/nemesis/backup/kia-tweaks.systemui
+B=/data/nemesis/backup/cabinwright.tweaks.systemui
+LEGACY_B=/data/nemesis/backup/kia-tweaks.systemui   # kia.tweaks' (this package's earlier name); read only
 OLD_B=/data/nemesis/backup/ev6.systemui      # taken by the earlier ev6-fixes test install
-WORK=/data/nemesis/kia-tweaks/skip-consent
-PENDING=/data/nemesis/kia-tweaks/skip-consent.pending
-KP=$D/../../lib/kiapatch.jar
+WORK=/data/nemesis/cabinwright/tweaks/skip-consent
+PENDING=/data/nemesis/cabinwright/tweaks/skip-consent.pending
+KP=$D/../../lib/tweakpatch.jar
 SUM_APK=512fa1835649e710d91deeb37c90433d       # stock, firmware 260507
 SUM_ODEX=8abb72b9715bc8e4746ac9ee3b03ab39
 SUM_OURS=15e8195ea7c5099fc0cb4ba734370ddc      # stock apk + patched classes.dex, as built here
@@ -27,7 +28,7 @@ backup_ok() { [ "$(sum $1/SystemUI.apk)" = $SUM_APK ] && [ "$(sum $1/SystemUI.od
 
 # the patch tool runs in its own dalvik (root here can't write /data/dalvik-cache)
 kp() {
-    ANDROID_DATA=$WORK/data CLASSPATH=$KP app_process /system/bin dev.kiatweaks.patch.Main "$@"
+    ANDROID_DATA=$WORK/data CLASSPATH=$KP app_process /system/bin dev.cabinwright.tweaks.patch.Main "$@"
 }
 
 # a change made during this boot only shows after a restart

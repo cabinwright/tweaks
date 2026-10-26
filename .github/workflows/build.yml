@@ -23,12 +23,16 @@ jobs:
       - name: Tweak ids
         run: sh tools/check-tweak-ids.sh
 
-      # the kia-menu API the Tweaks app is built on, pinned to a release
+      # tweaksd against a mock head unit: the move from kia.tweaks, removed and shared tweaks
+      - name: tweaksd host test
+        run: sh tests/tweaksd-test.sh
+
+      # the Cabinwright API the Tweaks app is built on, pinned to a release
       - uses: actions/checkout@v4
         with:
-          repository: hazptr/kia-menu
-          ref: v1.1
-          path: kia-menu
+          repository: cabinwright/menu
+          ref: v1.3
+          path: menu
 
       # before setup-java: the runner's sdkmanager needs its default (newer) Java
       - name: Android SDK parts
@@ -41,11 +45,11 @@ jobs:
 
       - name: Signing key
         env:
-          KEYSTORE_B64: ${{ secrets.KIAMENU_KEYSTORE_B64 }}
+          KEYSTORE_B64: ${{ secrets.CABINWRIGHT_KEYSTORE_B64 }}
         run: |
           if [ -n "$KEYSTORE_B64" ]; then
             echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
-            echo "KIAMENU_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "CABINWRIGHT_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
           else
             # forks and PRs from them: a throwaway debug key
             mkdir -p ~/.android
@@ -64,14 +68,14 @@ jobs:
 
       - name: Build
         env:
-          KIAMENU_KEYSTORE_PASS: ${{ secrets.KIAMENU_KEYSTORE_PASS }}
+          CABINWRIGHT_KEYSTORE_PASS: ${{ secrets.CABINWRIGHT_KEYSTORE_PASS }}
         run: |
-          KIA_MENU=$PWD/kia-menu sh build.sh
-          mv dist/kia.tweaks.zip "dist/kia.tweaks-v$VERSION.zip"
+          CABINWRIGHT_MENU=$PWD/menu sh build.sh
+          mv dist/cabinwright.tweaks.zip "dist/cabinwright.tweaks-v$VERSION.zip"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: kia.tweaks-v${{ env.VERSION }}
+          name: cabinwright.tweaks-v${{ env.VERSION }}
           path: dist/*.zip
 
       - name: Release
@@ -80,10 +84,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > "$RUNNER_TEMP/notes.md" <<NOTES
-          NEMESIS package \`kia.tweaks\` $VERSION: install \`kia.tweaks-v$VERSION.zip\` with NEMESIS
+          NEMESIS package \`cabinwright.tweaks\` $VERSION: install \`cabinwright.tweaks-v$VERSION.zip\` with NEMESIS
           (USB stick, or \`nemesis install --update <zip>\` over ADB).
 
-          The Tweaks app shows up in All Menus with the kia-menu launcher hook installed.
+          The Tweaks app shows up in All Menus with the Cabinwright launcher hook installed.
           NOTES
-          gh release create "$GITHUB_REF_NAME" dist/*.zip --title "kia-tweaks $GITHUB_REF_NAME" \
+          gh release create "$GITHUB_REF_NAME" dist/*.zip --title "Cabinwright tweaks $GITHUB_REF_NAME" \
             --notes-file "$RUNNER_TEMP/notes.md" --generate-notes

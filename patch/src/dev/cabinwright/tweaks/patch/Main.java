@@ -1,4 +1,4 @@
-package dev.kiatweaks.patch;
+package dev.cabinwright.tweaks.patch;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -16,9 +16,9 @@ import java.util.zip.Inflater;
 
 /**
  * Rebuilds patched system app code on the head unit from its own stock files, so nothing of
- * the manufacturer's is shipped. Run as root with app_process:
+ * The manufacturer's is shipped. Run as root with app_process:
  *
- *   CLASSPATH=kiapatch.dex app_process /system/bin dev.kiatweaks.patch.Main <command> ...
+ *   CLASSPATH=tweakpatch.dex app_process /system/bin dev.cabinwright.tweaks.patch.Main <command> ...
  *
  *   md5 <file>                      print the file's md5
  *   delta <patch.lpd> <src> <dst>   rebuild dst from src (HMG Leafia Plus's .lpd format:
@@ -45,7 +45,7 @@ public final class Main {
                 throw new IOException("usage: md5 <file> | delta <lpd> <src> <dst> | zipadd <apk> <dex> <dst>");
             }
         } catch (Exception e) {
-            System.err.println("kiapatch: " + e.getMessage());
+            System.err.println("tweakpatch: " + e.getMessage());
             System.exit(1);
         }
     }

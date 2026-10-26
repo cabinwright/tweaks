@@ -1,8 +1,9 @@
-package dev.kiatweaks;
+package dev.cabinwright.tweaks;
 
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Environment;
+import android.util.Log;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -22,7 +23,9 @@ import java.util.Set;
  * sdcard, so that copy never turns on a risk=system tweak.
  */
 final class TweakStore {
-    static final File BACKUP = new File(Environment.getExternalStorageDirectory(), "kia-tweaks/desired.json");
+    static final File BACKUP = new File(Environment.getExternalStorageDirectory(), "cabinwright/tweaks/desired.json");
+    /** Where kia.tweaks (this package's name before 1.4) kept its copy; read only. */
+    static final File LEGACY_BACKUP = new File(Environment.getExternalStorageDirectory(), "kia-tweaks/desired.json");
 
     private final SharedPreferences prefs;
 
@@ -96,8 +99,14 @@ final class TweakStore {
     private void restore() {
         SharedPreferences.Editor edit = prefs.edit().putBoolean("restored", true)
                 .putLong("gen", nextGeneration());
-        // tweaksd's copy of what it was last told
+        // tweaksd's copy of what it was last told; on the first start after the move from
+        // kia.tweaks, before tweaksd has imported its data, kia.tweaks' own
+        boolean legacy = false;
         JSONObject daemon = DaemonState.readJson(DaemonState.FILE);
+        if (daemon == null) {
+            daemon = DaemonState.readJson(DaemonState.LEGACY_FILE);
+            legacy = daemon != null;
+        }
         JSONObject tweaks = daemon == null ? null : daemon.optJSONObject("tweaks");
         Set<String> done = new HashSet<String>();
         if (tweaks != null) {
@@ -113,6 +122,10 @@ final class TweakStore {
         }
         // then the sdcard copy, for the rest
         JSONObject sd = DaemonState.readJson(BACKUP);
+        if (sd == null && !BACKUP.exists()) {
+            sd = DaemonState.readJson(LEGACY_BACKUP);
+            legacy |= sd != null;
+        }
         JSONObject on = sd == null ? null : sd.optJSONObject("on");
         if (on != null) {
             for (Tweak t : Tweak.all()) {
@@ -121,5 +134,9 @@ final class TweakStore {
             }
         }
         edit.commit();
+        if (legacy) {
+            Log.i(StateProvider.TAG, "imported the switches from kia.tweaks (" + done.size() + " from its tweaksd)");
+            backup();
+        }
     }
 }

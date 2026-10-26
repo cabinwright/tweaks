@@ -4,7 +4,7 @@ D=${0%/*}
 . $D/common.sh
 
 if is_stock; then echo "already off"; exit 0; fi
-backup_ok $B || { backup_ok $OLD_B && B=$OLD_B; } || fail "no stock backup - nothing changed"
+backup_ok $B || { backup_ok $LEGACY_B && B=$LEGACY_B; } || { backup_ok $OLD_B && B=$OLD_B; } || fail "no stock backup - nothing changed"
 
 /system/xbin/nemesis remount rw >/dev/null 2>&1 || fail "remount rw"
 cp $B/SystemUI.apk $APP/SystemUI.apk.new && cp $B/SystemUI.odex $APP/SystemUI.odex.new || fail "copy stock files"

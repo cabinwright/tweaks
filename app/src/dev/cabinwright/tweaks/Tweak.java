@@ -1,4 +1,4 @@
-package dev.kiatweaks;
+package dev.cabinwright.tweaks;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -12,13 +12,13 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * One tweak folder, from its tweak.conf: kia.tweaks' own, or a tweak pack's (another NEMESIS
+ * One tweak folder, from its tweak.conf: cabinwright.tweaks' own, or a tweak pack's (another NEMESIS
  * package with a tweaks/ folder). The package files are world-readable, so the app reads them
  * where NEMESIS put them rather than keeping a copy.
  */
 final class Tweak {
     static final File APPS = new File("/data/nemesis/apps");
-    static final String OWN = "kia.tweaks";
+    static final String OWN = "cabinwright.tweaks";
 
     final String id;
     /** The NEMESIS package the tweak comes from. */
@@ -57,7 +57,7 @@ final class Tweak {
     }
 
     /**
-     * All tweaks: kia.tweaks' own, then each pack's, by package id and then folder name. As in
+     * All tweaks: cabinwright.tweaks' own, then each pack's, by package id and then folder name. As in
      * tweaksd, an id belongs to the first package that has it, and ids are limited to what
      * tweaksd accepts.
      */

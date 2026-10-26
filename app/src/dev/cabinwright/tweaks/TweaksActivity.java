@@ -1,4 +1,4 @@
-package dev.kiatweaks;
+package dev.cabinwright.tweaks;
 
 import android.graphics.Color;
 import android.os.Bundle;
@@ -11,7 +11,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import dev.kiamenu.api.ui.KiaPage;
+import dev.cabinwright.api.ui.CarPage;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -22,12 +22,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Tweaks: the package's tweaks as a list laid out like Kia's own settings (checkbox rows on
+ * Tweaks: the package's tweaks as a list laid out like the head unit's own settings (checkbox rows on
  * the left, the selected one's description on the right). A tap on the checkbox flips the
  * switch, which tweaksd picks up within a few seconds; a tap on the row shows its details
  * and recent log. Tweaks that change system files ask first.
  */
-public class TweaksActivity extends KiaPage {
+public class TweaksActivity extends CarPage {
     private static final long REFRESH_MS = 2000;
 
     private final Handler handler = new Handler();
@@ -72,7 +72,7 @@ public class TweaksActivity extends KiaPage {
             root.setMinimumHeight(dp(76));
             root.setPadding(0, dp(6), dp(16), dp(6));
 
-            // a big touch target around the small box, as in Kia's lists
+            // a big touch target around the small box, as in the head unit's lists
             FrameLayout box = new FrameLayout(TweaksActivity.this);
             check = new Check(TweaksActivity.this, BG);
             box.addView(check, new FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER));
@@ -116,7 +116,7 @@ public class TweaksActivity extends KiaPage {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Kia's list separators and side panel, measured from Setup in each mode
+        // The head unit's list separators and side panel, measured from Setup in each mode
         PANEL = isNight(this) ? 0xFF101113 : 0xFFE6E6E6;
         SEP = isNight(this) ? 0xFF08080C : 0xFFBCBCBC;
         store = new TweakStore(this);
@@ -148,7 +148,7 @@ public class TweaksActivity extends KiaPage {
         body.addView(panelScroll, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1));
         page.addView(body, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
 
-        empty = text("No tweaks found. Is the kia.tweaks package installed?", 20, MUTED, false);
+        empty = text("No tweaks found. Is the cabinwright.tweaks package installed?", 20, MUTED, false);
         empty.setPadding(dp(16), dp(20), dp(16), 0);
         list.addView(empty);
         List<Tweak> tweaks = Tweak.all();
@@ -239,6 +239,11 @@ public class TweaksActivity extends KiaPage {
         boolean alive = daemon != null && daemon.alive();
         if (rows.isEmpty()) {
             service.setText("");
+        } else if (daemon != null && daemon.standby()) {
+            // kia.tweaks (this package's earlier name) is installed and its tweaksd runs them
+            service.setText("");
+            showBanner(BAD, "The old Tweaks package (kia.tweaks) still runs these tweaks. "
+                    + "Switches here take effect once it is removed.");
         } else if (!alive) {
             service.setText("");
             showBanner(BAD, daemon == null || !daemon.trusted
@@ -349,8 +354,8 @@ public class TweaksActivity extends KiaPage {
         panel.removeAllViews();
         panel.addView(text((confirmOn ? "Turn on " : "Turn off ") + t.name + "?", 22, TEXT, false));
         TextView what = text(confirmOn
-                ? "This changes Kia's system software on the head unit."
-                : "This puts Kia's original system software back.", 17, TEXT, false);
+                ? "This changes the head unit's system software on the head unit."
+                : "This puts the head unit's original system software back.", 17, TEXT, false);
         what.setPadding(0, dp(8), 0, dp(6));
         panel.addView(what);
         TextView desc = text(t.description, 16, MUTED, false);

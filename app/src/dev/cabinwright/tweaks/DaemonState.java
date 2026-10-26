@@ -1,4 +1,4 @@
-package dev.kiatweaks;
+package dev.cabinwright.tweaks;
 
 import android.os.Environment;
 
@@ -15,8 +15,10 @@ import java.io.IOException;
  * app could write that one.
  */
 final class DaemonState {
-    static final File FILE = new File("/data/nemesis/kia-tweaks/state.json");
-    static final File SD_FILE = new File(Environment.getExternalStorageDirectory(), "kia-tweaks/state.json");
+    static final File FILE = new File("/data/nemesis/cabinwright/tweaks/state.json");
+    static final File SD_FILE = new File(Environment.getExternalStorageDirectory(), "cabinwright/tweaks/state.json");
+    /** kia.tweaks' (this package's name before 1.4): root's too, read only. */
+    static final File LEGACY_FILE = new File("/data/nemesis/kia-tweaks/state.json");
     /** tweaksd writes at least every 15 s. */
     static final long STALE_S = 45;
 
@@ -34,6 +36,11 @@ final class DaemonState {
         if (o != null) return new DaemonState(o, true);
         o = readJson(SD_FILE);
         return o == null ? null : new DaemonState(o, false);
+    }
+
+    /** tweaksd stands by while kia.tweaks' tweaksd runs; the states are then that one's. */
+    boolean standby() {
+        return trusted && json.has("standby");
     }
 
     long time() {
