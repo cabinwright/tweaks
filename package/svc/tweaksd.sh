@@ -9,6 +9,8 @@
 # - tweaksd keeps a copy of every tweak pack in $SHADOW, refreshed when its version changes.
 #   When a pack has been gone for $DEPART_AFTER s with no NEMESIS install running, it was
 #   removed rather than updated: its tweaks are turned off from that copy, then the copy goes.
+#   Until then they are "pending" and left as they are. A pack's run.sh is restarted when the
+#   pack's version changes, as it would still run the old script.
 # - tweak.conf retired=1: the package no longer offers the tweak; it is turned off, and the
 #   app hides it once it's off. A tweak that changes the system stays in its package as a
 #   retired placeholder for good; only kind=service tweaks may simply be dropped.
@@ -67,7 +69,8 @@ tlog() { print -r -- "$(date) tweaksd: $2" >> "$LOGS/$1.log"; log "$1: $2"; }
 conf() {   # conf <id> <key> [default]
     local l v=$3 t
     read -r t < "$INDEX/$1"
-    while IFS= read -r l; do
+    # a pending or orphaned tweak's folder is gone: its defaults
+    [ -f "$t/tweak.conf" ] && while IFS= read -r l; do
         case "$l" in "$2="*) v=${l#*=}; break ;; esac
     done < "$t/tweak.conf"
     print -r -- "$v"
@@ -87,7 +90,10 @@ supported() {
 
 get() { cat "$RUN/$1.$2" 2>/dev/null; }
 # only when it changes: this is flash, and some values are re-put every round
-put() { [ -f "$RUN/$1.$2" ] && [ "$(cat "$RUN/$1.$2")" = "$3" ] || print -r -- "$3" > "$RUN/$1.$2"; }
+put() {
+    local v
+    [ -f "$RUN/$1.$2" ] && IFS= read -r v < "$RUN/$1.$2" && [ "$v" = "$3" ] || print -r -- "$3" > "$RUN/$1.$2"
+}
 
 # state: on, off, error, working or unsupported; the time of the last change is kept
 set_state() {
@@ -303,6 +309,7 @@ tweak_json() {
     print -n ",\"last_change\":$(get "$1" since || print 0)"
     print -n ",\"name\":$(js "$(get "$1" name)"),\"pack\":$(js "$(get "$1" pack)")"
     [ -n "$(get "$1" departed)" ] && print -n ',"departed":true'
+    [ -n "$(get "$1" pending)" ] && print -n ',"pending":true'
     [ -n "$(get "$1" orphan)" ] && print -n ',"orphan":true'
 
     # the script for the current switch position failed: it waits for the next change
@@ -363,8 +370,10 @@ shadow_packs() {
         d=${d%/}; p=${d##*/}
         [ "$d" = "${TWEAKS%/tweaks}" ] && continue
         ls "$d/tweaks/"*/tweak.conf >/dev/null 2>&1 || continue
-        rm -f "$SHADOW/$p.missing"
+        [ -f "$SHADOW/$p.missing" ] && { rm -f "$SHADOW/$p.missing"; log "$p is back" >&2; }
         [ -d "$SHADOW/$p" ] && [ "$(version_of "$SHADOW/$p")" = "$(version_of "$d")" ] && continue
+        # not while NEMESIS may still be writing it: a half copy would never be refreshed
+        nemesis_busy && continue
         rm -rf "$SHADOW/$p.tmp"
         cp -R "$d" "$SHADOW/$p.tmp" && rm -rf "$SHADOW/$p" && mv "$SHADOW/$p.tmp" "$SHADOW/$p" \
             && log "kept a copy of $p $(version_of "$d")" >&2
@@ -386,25 +395,36 @@ effective_want() {
     else cat "$WANT/$1" 2>/dev/null; fi
 }
 
-# conflicts= and replaces= list tweaks that must be off before this one turns on; sets
-# BLOCKER to the first one that isn't
+# conflicts= and replaces= list tweaks that must be off before this one turns on, either way
+# round: a tweak that is on also keeps off those that it lists. Sets BLOCKER to the first
+# one in the way.
 clear_of_conflicts() {
-    local c st
+    local c f l
+    BLOCKER=
+    l="$(conf "$1" conflicts) $(conf "$1" replaces)"
     set -f
-    for c in $(conf "$1" conflicts) $(conf "$1" replaces); do
-        c=${c%,}
+    for c in ${l//,/ }; do
         [ -f "$INDEX/$c" ] || continue
-        st=$(get "$c" state)
-        case "$st" in on|working|error) set +f; BLOCKER=$(get "$c" name); BLOCKER=${BLOCKER:-$c}; return 1 ;; esac
+        case "$(get "$c" state)" in on|working|error) set +f; BLOCKER=$c; break ;; esac
     done
     set +f
-    return 0
+    [ -z "$BLOCKER" ] && for f in "$INDEX"/*; do
+        c=${f##*/}
+        [ "$c" != "$1" ] || continue
+        case "$(get "$c" state)" in on|working|error) ;; *) continue ;; esac
+        l="$(conf "$c" conflicts) $(conf "$c" replaces)"
+        case " ${l//,/ } " in *" $1 "*) BLOCKER=$c; break ;; esac
+    done
+    [ -z "$BLOCKER" ] && return 0
+    l=$(get "$BLOCKER" name)
+    BLOCKER=${l:-$BLOCKER}
+    return 1
 }
 
 # rebuilds $INDEX: every tweak folder of kia.tweaks and the installed tweak packs, then the
 # tweaks of removed packs (from their copies, marked departed) until they are off.
 index_tweaks() {
-    local d id own seen= f gone p
+    local d id own seen= f gone p v
     # only ever folders inside $SHADOW: these get deleted below
     gone=
     for p in $(shadow_packs); do
@@ -421,13 +441,21 @@ index_tweaks() {
                 continue ;;
         esac
         seen="$seen $id"
-        rm -f "$RUN/$id.orphan" "$RUN/$id.pending"
-        case "$d" in "$SHADOW"/*) put "$id" departed 1 ;; *) rm -f "$RUN/$id.departed" ;; esac
+        for f in orphan pending departed; do [ -f "$RUN/$id.$f" ] && rm -f "$RUN/$id.$f"; done
+        case "$d" in "$SHADOW"/*) put "$id" departed 1 ;; esac
         put "$id" pack "$(pkg_of "$d")"
         own=
         [ -f "$INDEX/$id" ] && read -r own < "$INDEX/$id"
         [ "$own" = "$d" ] || { print -r -- "$d" > "$INDEX/$id"; log "$id: from $d"; }
         put "$id" name "$(conf "$id" name "$id")"
+        # an updated pack's run.sh still runs the old script: start it over, at once (not
+        # after $RETRY, which would let a tweak it conflicts with turn on meanwhile)
+        v=$(version_of "${d%/tweaks/*}")
+        if [ "$(get "$id" ver)" != "$v" ]; then
+            [ -n "$(get "$id" ver)" ] && [ -n "$(running "$id")" ] && {
+                tlog "$id" "$(pkg_of "$d") is now $v; restarting run.sh"; stop_service "$id"; rm -f "$RUN/$id.started"; }
+            put "$id" ver "$v"
+        fi
     done
     for f in "$INDEX"/*; do
         [ -f "$f" ] || continue
@@ -440,7 +468,7 @@ index_tweaks() {
             continue
         fi
         [ -n "$(running "$id")" ] && stop_service "$id"
-        if [ "$(get "$id" state)" = on ] && [ "$(get "$id" kind)" = oneshot ]; then
+        if [ "$(get "$id" kind)" = oneshot ] && case "$(get "$id" state)" in on|working|error) ;; *) false ;; esac; then
             # its files went without a copy to turn it off with: say so rather than forget it
             put "$id" orphan 1
             set_state "$id" error "left on: $(get "$id" pack) was removed and it can't be turned off from here"
@@ -454,6 +482,11 @@ index_tweaks() {
         for d in "$p"/tweaks/*/; do
             id=${d%/}; id=${id##*/}
             case "$(get "$id" state)" in on|working|error) continue 2 ;; esac
+        done
+        # its tweaks go with it, so they aren't run from the copy's folder once it's gone
+        for d in "$p"/tweaks/*/; do
+            d=${d%/}; id=${d##*/}
+            [ -f "$INDEX/$id" ] && read -r f < "$INDEX/$id" && [ "$f" = "$d" ] && rm -f "$INDEX/$id" "$RUN/$id".*
         done
         case "$p" in "$SHADOW"/[a-z0-9]*) rm -rf "$p" "$p.missing" ;; esac
         log "${p##*/}: removed; its tweaks are off"
@@ -525,7 +558,8 @@ while :; do
             fi
             want=$(effective_want "$id")
             case "$pass:$want" in off:1|on:0|on:) continue ;; esac
-            if [ "$want" = 1 ] && ! clear_of_conflicts "$id"; then
+            if [ "$want" = 1 ] && case "$(get "$id" state)" in on|working|error) false ;; esac \
+                    && ! clear_of_conflicts "$id"; then
                 set_state "$id" off "waiting for $BLOCKER to turn off"
                 continue
             fi
