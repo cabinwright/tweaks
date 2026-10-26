@@ -1,6 +1,6 @@
-package dev.cabinwright.tweaks
+package app.cabinwright.tweaks
 
-import dev.cabinwright.api.broker.CarBroker
+import app.cabinwright.api.broker.CarBroker
 import org.json.JSONArray
 import org.json.JSONObject
 

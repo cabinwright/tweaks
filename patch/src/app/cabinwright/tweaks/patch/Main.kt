@@ -4,7 +4,7 @@
  * and a dalvik-cache of its own in $TWEAK_DATA:
  *
  *   ANDROID_DATA=<dir with dalvik-cache/> CLASSPATH=tweakpatch.jar \
- *       app_process /system/bin dev.cabinwright.tweaks.patch.Main <command> ...
+ *       app_process /system/bin app.cabinwright.tweaks.patch.Main <command> ...
  *
  *   md5 <file>                      print the file's md5
  *   delta <patch.lpd> <src> <dst>   rebuild dst from src (HMG Leafia Plus's .lpd format:
@@ -18,7 +18,7 @@
  */
 @file:JvmName("Main")
 
-package dev.cabinwright.tweaks.patch
+package app.cabinwright.tweaks.patch
 
 import java.io.ByteArrayOutputStream
 import java.io.File

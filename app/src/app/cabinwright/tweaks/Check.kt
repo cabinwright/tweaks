@@ -1,4 +1,4 @@
-package dev.cabinwright.tweaks
+package app.cabinwright.tweaks
 
 import android.content.Context
 import android.graphics.Canvas
@@ -6,7 +6,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.view.View
-import dev.cabinwright.api.ui.CarPage
+import app.cabinwright.api.ui.CarPage
 import kotlin.math.max
 import kotlin.math.min
 

@@ -7,5 +7,5 @@ types=application
 [app.0]
 kind=apk
 path=tweaks.apk
-package=dev.cabinwright.tweaks
-component=dev.cabinwright.tweaks/.TweaksActivity
+package=app.cabinwright.tweaks
+component=app.cabinwright.tweaks/.TweaksActivity

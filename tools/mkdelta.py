@@ -5,7 +5,7 @@ usage: mkdelta.py <source> <target> <out.lpd>
 The format is HMG Leafia Plus's (so its lpatch can apply it too): "LPD1", u32 source length,
 md5 source, u32 target length, md5 target, u32 compression (1 = raw deflate), u32 payload
 length, then the payload: bsdiff control triples, diff bytes and extra bytes. Applied by
-patch/src/dev/cabinwright/tweaks/patch/Main.kt, which writes nothing unless the source is that exact
+patch/src/app/cabinwright/tweaks/patch/Main.kt, which writes nothing unless the source is that exact
 file and the result matches. Needs bsdiff4 (pip install bsdiff4==1.3.1).
 """
 import hashlib, struct, sys, zlib

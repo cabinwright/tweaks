@@ -19,7 +19,7 @@ cd "$W/fx"
 fails=0
 ok() { echo "ok   $1"; }
 bad() { echo "FAIL $1"; fails=$((fails + 1)); }
-kp() { "$JDK/bin/java" -cp "$W/tweakpatch.jar" dev.cabinwright.tweaks.patch.Main "$@"; }
+kp() { "$JDK/bin/java" -cp "$W/tweakpatch.jar" app.cabinwright.tweaks.patch.Main "$@"; }
 md5of() { if command -v md5 >/dev/null; then md5 -q "$1"; else md5sum "$1" | cut -d' ' -f1; fi; }
 # refuses <name> <expected message part> <command...>: exit 1, the message, and no output file
 refuses() {

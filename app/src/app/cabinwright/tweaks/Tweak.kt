@@ -1,4 +1,4 @@
-package dev.cabinwright.tweaks
+package app.cabinwright.tweaks
 
 import org.json.JSONArray
 import org.json.JSONObject

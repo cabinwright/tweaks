@@ -69,5 +69,5 @@ echo "classes.dex $(md5of "$CS/classes.dex")"
 CABINWRIGHT_MENU=${CABINWRIGHT_MENU:-$HERE/../../menu}
 export CABINWRIGHT_MENU
 sh "$HERE/../patch/build.sh" --classes "$WORK/tweakpatch.jar" >/dev/null
-"$JAVA" -cp "$WORK/tweakpatch.jar" dev.cabinwright.tweaks.patch.Main zipadd "$STOCK/SystemUI.apk" "$CS/classes.dex" "$CS/SystemUI.apk"
+"$JAVA" -cp "$WORK/tweakpatch.jar" app.cabinwright.tweaks.patch.Main zipadd "$STOCK/SystemUI.apk" "$CS/classes.dex" "$CS/SystemUI.apk"
 echo "SUM_OURS=$(md5of "$CS/SystemUI.apk")"

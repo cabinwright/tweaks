@@ -24,7 +24,7 @@ is_ours() { [ "$(sum $APP/SystemUI.apk)" = $SUM_OURS ]; }
 
 # the patch tool runs in a dalvik of its own, with its cache in $WORK
 kp() {
-    ANDROID_DATA=$WORK/data CLASSPATH=$KP /system/bin/app_process /system/bin dev.cabinwright.tweaks.patch.Main "$@"
+    ANDROID_DATA=$WORK/data CLASSPATH=$KP /system/bin/app_process /system/bin app.cabinwright.tweaks.patch.Main "$@"
 }
 
 # a change made during this boot only shows after a restart

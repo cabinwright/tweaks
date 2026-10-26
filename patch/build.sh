@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds the on-car patch tool (dev.cabinwright.tweaks.patch.Main, Kotlin) for app_process:
+# Builds the on-car patch tool (app.cabinwright.tweaks.patch.Main, Kotlin) for app_process:
 # compiled against Android 4.4's android.jar and shrunk by R8, with the pinned tools from the
 # Cabinwright API's fetch-tools.sh (CABINWRIGHT_MENU, the menu checkout; default ../menu).
 # --classes writes the shrunk class files instead of a dex (tests/tweakpatch-test.sh runs

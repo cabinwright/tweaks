@@ -1,4 +1,4 @@
-package dev.cabinwright.tweaks
+package app.cabinwright.tweaks
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -14,8 +14,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import dev.cabinwright.api.broker.CarBroker
-import dev.cabinwright.api.ui.CarPage
+import app.cabinwright.api.broker.CarBroker
+import app.cabinwright.api.ui.CarPage
 import java.util.regex.Pattern
 
 /**
@@ -550,8 +550,8 @@ class TweaksActivity : CarPage() {
         private const val BANNER_ALPHA = 60
         private const val LOG_LINES = 20
 
-        private const val STORE_APP = "dev.cabinwright.store"
-        private const val SHOW_APP = "dev.cabinwright.store.action.SHOW_APP"
+        private const val STORE_APP = "app.cabinwright.store"
+        private const val SHOW_APP = "app.cabinwright.store.action.SHOW_APP"
 
         /** sh `date` format, "Sun Oct  5 18:31:02 EDT 2026", at the start of a log line */
         private val DATE = Pattern.compile("^\\w{3} (\\w{3}) +(\\d+) (\\d\\d:\\d\\d):\\d\\d \\S+ \\d{4} (.*)$")

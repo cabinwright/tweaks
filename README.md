@@ -22,7 +22,7 @@ store's [design](https://github.com/cabinwright/store/blob/main/docs/design.md) 
 
 | Part | What it is |
 |---|---|
-| `app/` | The Tweaks app (`dev.cabinwright.tweaks`): lists the tweaks, their state, needs and log, and switches them, through the store's broker (`CarBroker`, capability `tweaks`). |
+| `app/` | The Tweaks app (`app.cabinwright.tweaks`): lists the tweaks, their state, needs and log, and switches them, through the store's broker (`CarBroker`, capability `tweaks`). |
 | `package/tweaks/<id>/` | One folder per tweak: `tweak.conf` plus shell scripts. [docs/writing-a-tweak.md](docs/writing-a-tweak.md) has the format. |
 | `patch/` | `tweakpatch`, a small tool run on the car that rebuilds patched system code from the car's own stock files. |
 | `systemui/` | Builds the skip-consent delta (`patch.py`, `build.sh`) and the USB rescue script. |
