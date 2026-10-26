@@ -23,25 +23,48 @@ jobs:
       - name: Tweak ids
         run: sh tools/check-tweak-ids.sh
 
-      # tweaksd against a mock head unit: the move from kia.tweaks, removed and shared tweaks
+      # tweaksd against a mock head unit: the move from kia.tweaks, removed and shared tweaks,
+      # log rotation. In mksh, the car's shell, and in bash
       - name: tweaksd host test
-        run: sh tests/tweaksd-test.sh
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq mksh > /dev/null
+          KT_SH=mksh sh tests/tweaksd-test.sh
+          KT_SH=bash sh tests/tweaksd-test.sh
 
-      # the Cabinwright API the Tweaks app is built on, pinned to a release
+      # the Cabinwright API the Tweaks app is built on, and its pinned tools and lint settings,
+      # pinned to a release
       - uses: actions/checkout@v4
         with:
           repository: cabinwright/menu
           ref: v1.3
           path: menu
 
-      # before setup-java: the runner's sdkmanager needs its default (newer) Java
+      # before setup-java: the runner's sdkmanager needs its default (newer) Java.
+      # Only build-tools: android.jar (API 19) comes from fetch-tools.sh with the rest
       - name: Android SDK parts
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;29.0.2" "platforms;android-23" > /dev/null
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;29.0.2" > /dev/null
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '11'
+
+      # Kotlin, R8, android-19.jar, ktlint, detekt, shellcheck: pinned in the menu's fetch-tools.sh
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/cabinwright-tools
+          key: cabinwright-tools-${{ runner.os }}-${{ hashFiles('menu/api/tools/fetch-tools.sh') }}
+
+      - name: Tools
+        run: sh menu/api/tools/fetch-tools.sh
+
+      # ktlint, detekt and ShellCheck (tweaksd and the tweak scripts as the car's mksh)
+      - name: Lint
+        run: sh menu/api/tools/lint.sh .
+
+      # the patch tool, as R8 shrinks it, on the host's JVM
+      - name: tweakpatch host test
+        run: CABINWRIGHT_MENU=$PWD/menu sh tests/tweakpatch-test.sh
 
       - name: Signing key
         env:
@@ -72,11 +95,15 @@ jobs:
         run: |
           CABINWRIGHT_MENU=$PWD/menu sh build.sh
           mv dist/cabinwright.tweaks.zip "dist/cabinwright.tweaks-v$VERSION.zip"
+          mv dist/cabinwright.tweaks.map "dist/cabinwright.tweaks-v$VERSION.map"
+          mv dist/cabinwright.tweaks-tweakpatch.map "dist/cabinwright.tweaks-v$VERSION-tweakpatch.map"
 
       - uses: actions/upload-artifact@v4
         with:
           name: cabinwright.tweaks-v${{ env.VERSION }}
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/*.map
 
       - name: Release
         if: github.ref_type == 'tag'
@@ -86,8 +113,10 @@ jobs:
           cat > "$RUNNER_TEMP/notes.md" <<NOTES
           NEMESIS package \`cabinwright.tweaks\` $VERSION: install \`cabinwright.tweaks-v$VERSION.zip\` with NEMESIS
           (USB stick, or \`nemesis install --update <zip>\` over ADB).
+          \`cabinwright.tweaks-v$VERSION.map\` (the Tweaks app) and \`cabinwright.tweaks-v$VERSION-tweakpatch.map\`
+          (the patch tool) are R8's name maps, for reading stack traces (retrace).
 
           The Tweaks app shows up in All Menus with the Cabinwright launcher hook installed.
           NOTES
-          gh release create "$GITHUB_REF_NAME" dist/*.zip --title "Cabinwright tweaks $GITHUB_REF_NAME" \
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.map --title "Cabinwright tweaks $GITHUB_REF_NAME" \
             --notes-file "$RUNNER_TEMP/notes.md" --generate-notes

@@ -20,7 +20,8 @@ each with an on/off switch in the **Tweaks** app. Written for the 2023 Kia EV6 (
 | `package/tweaks/<id>/` | One folder per tweak: `tweak.conf` plus shell scripts (`run.sh`, or `enable.sh` / `disable.sh` / `status.sh`). |
 | Tweak packs | Other NEMESIS packages with a `tweaks/<id>/` folder of their own. They show up in the same app. |
 | `tools/check-tweak-ids.sh` | CI check: a tweak that changes the system is never dropped between releases, only retired. |
-| `tests/tweaksd-test.sh` | Host test: tweaksd against a mock head unit (the move from kia.tweaks, removed packs). |
+| `tests/tweaksd-test.sh` | Host test: tweaksd against a mock head unit (the move from kia.tweaks, removed packs, log rotation). |
+| `tests/tweakpatch-test.sh` | Host test: `tweakpatch`, as R8 shrinks it, against generated deltas and zips. |
 | `patch/` | `tweakpatch`, a small tool run on the car that rebuilds patched system code from the car's own stock files. |
 | `systemui/` | Builds the skip-consent delta (`patch.py`, `build.sh`) and the USB rescue script. |
 | `docs/` | Notes on the head unit's internals. |
@@ -40,12 +41,26 @@ stick puts stock SystemUI back.
 ## Build
 
 ```sh
-CABINWRIGHT_MENU=../menu sh build.sh     # -> dist/cabinwright.tweaks.zip
+CABINWRIGHT_MENU=../menu sh build.sh     # -> dist/cabinwright.tweaks.zip, and R8's name maps
 sh tests/tweaksd-test.sh                 # KT_SH=mksh|bash picks the shell
+CABINWRIGHT_MENU=../menu sh tests/tweakpatch-test.sh
+sh tools/check-tweak-ids.sh
+sh ../menu/api/tools/lint.sh .           # ktlint, detekt, ShellCheck
 ```
 
-Needs the Android SDK (build-tools 29.0.2, platform 23) and JDK 11. Rebuilding the delta also
-needs the car's stock SystemUI and `bsdiff4==1.3.1` (see `systemui/build.sh`).
+`CABINWRIGHT_MENU` is a checkout of the Cabinwright menu repo (CI pins its release `v1.3`):
+its `api/` is compiled into the app, and its `api/tools` build and lint everything here with
+pinned tools (Kotlin, R8, Android 4.4's `android.jar`, ktlint, detekt, ShellCheck). Needs the
+Android SDK's build-tools 29.0.2, JDK 11 and Python 3. Rebuilding the delta also needs the car's
+stock SystemUI and `bsdiff4==1.3.1` (see `systemui/build.sh`).
+
+The app and `tweakpatch` are Kotlin, compiled against API 19 and shrunk by R8;
+`dist/cabinwright.tweaks.map` and `dist/cabinwright.tweaks-tweakpatch.map` are their name
+maps, for reading stack traces (retrace). There is no Java left: the code the skip-consent
+tweak puts into SystemUI is smali (`systemui/patch.py`), shipped only as a delta. On-car
+scripts are checked by ShellCheck as ksh, the nearest dialect to the car's mksh; the car
+has toolbox only (no sed, awk, head, tail, tr or printf), and mksh runs every part of a pipeline in a
+subshell, so `cmd | read var` sets nothing.
 
 ## Moving from kia.tweaks
 
