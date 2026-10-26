@@ -1,5 +1,22 @@
 #!/system/bin/sh
-# tweaksd: turns the tweaks in ../tweaks/<id>/ on and off as the Tweaks app (dev.kiatweaks) says.
+# tweaksd: turns tweaks on and off as the Tweaks app (dev.kiatweaks) says: its own in
+# ../tweaks/<id>/, and those of tweak packs, other NEMESIS packages with a tweaks/<id>/ folder
+# (/data/nemesis/apps/<package>/tweaks/<id>/). An id belongs to the first package that has
+# it, kia.tweaks first and then by package id; a clash is logged and the later one skipped.
+#
+# Nothing a package leaves behind is stranded, and packages need no install hooks (NEMESIS
+# runs a package's uninstall hooks on every update too, and they can't tell the two apart):
+# - tweaksd keeps a copy of every tweak pack in $SHADOW, refreshed when its version changes.
+#   When a pack has been gone for $DEPART_AFTER s with no NEMESIS install running, it was
+#   removed rather than updated: its tweaks are turned off from that copy, then the copy goes.
+# - tweak.conf retired=1: the package no longer offers the tweak; it is turned off, and the
+#   app hides it once it's off. A tweak that changes the system stays in its package as a
+#   retired placeholder for good; only kind=service tweaks may simply be dropped.
+# - replaces=<old id> (the app carries the old id's switch over to a renamed tweak) and
+#   conflicts=<ids>: this tweak waits until those are off. Every round turns tweaks off
+#   before it turns any on.
+# - A tweak that can't be turned off any more (its files gone, no copy) stays in state.json
+#   as "orphan" instead of being forgotten.
 #
 # The app is the only writer of the desired state; it serves it read-only at
 # content://dev.kiatweaks.state/desired, rows "id=<id>, on=0|1, gen=<n>" (gen changes on
@@ -26,6 +43,10 @@ TWEAKS=${HERE%/*}/tweaks
 DATA=/data/nemesis/kia-tweaks
 WANT=$DATA/want   # <id>: 1 or 0, as last read from the app
 RUN=$DATA/run     # <id>.pid .state .text .since .error .failed .status .checked
+INDEX=$DATA/index # <id>: the tweak's folder
+PACKS=/data/nemesis/apps
+SHADOW=$DATA/shadow   # <package>/: a copy of each tweak pack; <package>.missing: since when it's gone
+DEPART_AFTER=60
 LOGS=$DATA/logs
 SD=/sdcard/kia-tweaks
 URI=content://dev.kiatweaks.state/desired
@@ -44,10 +65,11 @@ log() { print -r -- "$(date) $1"; }
 tlog() { print -r -- "$(date) tweaksd: $2" >> "$LOGS/$1.log"; log "$1: $2"; }
 
 conf() {   # conf <id> <key> [default]
-    local l v=$3
+    local l v=$3 t
+    read -r t < "$INDEX/$1"
     while IFS= read -r l; do
         case "$l" in "$2="*) v=${l#*=}; break ;; esac
-    done < "$TWEAKS/$1/tweak.conf"
+    done < "$t/tweak.conf"
     print -r -- "$v"
 }
 
@@ -64,7 +86,8 @@ supported() {
 }
 
 get() { cat "$RUN/$1.$2" 2>/dev/null; }
-put() { print -r -- "$3" > "$RUN/$1.$2"; }
+# only when it changes: this is flash, and some values are re-put every round
+put() { [ -f "$RUN/$1.$2" ] && [ "$(cat "$RUN/$1.$2")" = "$3" ] || print -r -- "$3" > "$RUN/$1.$2"; }
 
 # state: on, off, error, working or unsupported; the time of the last change is kept
 set_state() {
@@ -86,9 +109,10 @@ text_of() { case "$1" in *" "*) print -r -- "${1#* }" ;; esac; }
 
 # status.sh's line as "state text"; a missing or broken script is an error
 status_of() {
-    local s
-    [ -f "$TWEAKS/$1/status.sh" ] || { print "error no status.sh"; return; }
-    s=$(sh "$TWEAKS/$1/status.sh" 2>/dev/null)
+    local s t
+    read -r t < "$INDEX/$1"
+    [ -f "$t/status.sh" ] || { print "error no status.sh"; return; }
+    s=$(sh "$t/status.sh" 2>/dev/null)
     s=${s%%$CR*}
     case "$s" in
         on|off|error) print -r -- "$s" ;;
@@ -108,7 +132,7 @@ rotate() {
 running() {   # pid of the tweak's run.sh while it is alive
     local p
     p=$(get "$1" pid)
-    [ -n "$p" ] && grep -q "tweaks/$1/run.sh" /proc/$p/cmdline 2>/dev/null && print "$p"
+    [ -n "$p" ] && grep -q "/tweaks/$1/run.sh" /proc/$p/cmdline 2>/dev/null && print "$p"
 }
 
 children() {
@@ -125,9 +149,11 @@ kill_tree() {
 }
 
 start_service() {
+    local t
+    read -r t < "$INDEX/$1"
     rotate "$1"
     tlog "$1" "starting run.sh"
-    sh "$TWEAKS/$1/run.sh" >> "$LOGS/$1.log" 2>&1 &
+    sh "$t/run.sh" >> "$LOGS/$1.log" 2>&1 &
     put "$1" pid $!
     put "$1" started "$(date +%s)"
 }
@@ -167,7 +193,8 @@ do_service() {   # <id> <want>
 # ---- kind=oneshot
 
 do_oneshot() {   # <id> <want> <recheck: 1 to run status.sh now>
-    local s st script rc
+    local s st script rc t
+    read -r t < "$INDEX/$1"
     s=$(get "$1" status)
     if [ "$3" = 1 ] || [ -z "$s" ] || [ $(($(date +%s) - $(get "$1" checked || print 0))) -ge $RECHECK ]; then
         s=$(status_of "$1")
@@ -185,7 +212,7 @@ do_oneshot() {   # <id> <want> <recheck: 1 to run status.sh now>
         write_state
         rotate "$1"
         tlog "$1" "running $script.sh"
-        sh "$TWEAKS/$1/$script.sh" >> "$LOGS/$1.log" 2>&1
+        sh "$t/$script.sh" >> "$LOGS/$1.log" 2>&1
         rc=$?
         s=$(status_of "$1")
         put "$1" status "$s"
@@ -270,10 +297,14 @@ log_tail() {
 tweak_json() {
     local e w
     e=$(get "$1" error)
-    w=$(cat "$WANT/$1" 2>/dev/null)
+    w=$(effective_want "$1")
     print -n "$(js "$1"):{\"want\":$(js "$([ "$w" = 1 ] && print on || { [ "$w" = 0 ] && print off; })")"
     print -n ",\"state\":$(js "$(get "$1" state)"),\"text\":$(js "$(get "$1" text)")"
     print -n ",\"last_change\":$(get "$1" since || print 0)"
+    print -n ",\"name\":$(js "$(get "$1" name)"),\"pack\":$(js "$(get "$1" pack)")"
+    [ -n "$(get "$1" departed)" ] && print -n ',"departed":true'
+    [ -n "$(get "$1" orphan)" ] && print -n ',"orphan":true'
+
     # the script for the current switch position failed: it waits for the next change
     [ -n "$w" ] && [ "$(get "$1" failed)" = "$w" ] && print -n ',"failed":true' || print -n ',"failed":false'
     print -n ",\"last_error\":$(js "${e#* }"),\"last_error_time\":${e%% *}"
@@ -286,10 +317,9 @@ write_state() {
     local d id sep= body
     body=$(
         print -n "\"pid\":$$,\"firmware\":$(js "$FIRMWARE"),\"app_seen\":$( [ -n "$APP_READ" ] && print true || print false),\"tweaks\":{"
-        for d in "$TWEAKS"/*/; do
-            id=${d%/}; id=${id##*/}
-            [ -f "$d/tweak.conf" ] || continue
-            print -n "$sep"; tweak_json "$id"; sep=,
+        for d in "$INDEX"/*; do
+            [ -f "$d" ] || continue
+            print -n "$sep"; tweak_json "${d##*/}"; sep=,
         done
         print -n '}'
     )
@@ -305,6 +335,131 @@ write_state() {
     fi
 }
 
+# the package a tweak folder belongs to
+pkg_of() { local p=${1%/tweaks/*}; print -r -- "${p##*/}"; }
+
+# a NEMESIS install or uninstall is running (an update removes the package for a moment)
+nemesis_busy() {
+    local f
+    # cmdline separates arguments with NULs, which the shell can't hold: grep the file
+    for f in /proc/[0-9]*/cmdline; do
+        grep -q nemesis "$f" 2>/dev/null && grep -q install "$f" 2>/dev/null && return 0
+    done
+    return 1
+}
+
+version_of() {   # version= of a package folder's NEMESIS.data
+    local l
+    while IFS= read -r l; do case "$l" in version=*) print -r -- "${l#version=}"; return ;; esac; done \
+        < "$1/NEMESIS.data" 2>/dev/null
+}
+
+# keeps $SHADOW in step with the installed packs; prints the folders of packs that have gone.
+# Its output is a list of folders to act on, so its log lines go to stderr (our log).
+shadow_packs() {
+    local d p now
+    now=$(date +%s)
+    for d in "$PACKS"/*/; do
+        d=${d%/}; p=${d##*/}
+        [ "$d" = "${TWEAKS%/tweaks}" ] && continue
+        ls "$d/tweaks/"*/tweak.conf >/dev/null 2>&1 || continue
+        rm -f "$SHADOW/$p.missing"
+        [ -d "$SHADOW/$p" ] && [ "$(version_of "$SHADOW/$p")" = "$(version_of "$d")" ] && continue
+        rm -rf "$SHADOW/$p.tmp"
+        cp -R "$d" "$SHADOW/$p.tmp" && rm -rf "$SHADOW/$p" && mv "$SHADOW/$p.tmp" "$SHADOW/$p" \
+            && log "kept a copy of $p $(version_of "$d")" >&2
+    done
+    for d in "$SHADOW"/*/; do
+        d=${d%/}; p=${d##*/}
+        case "$p" in *.tmp) rm -rf "$d"; continue ;; esac
+        [ -d "$PACKS/$p" ] && continue
+        [ -f "$SHADOW/$p.missing" ] || { print "$now" > "$SHADOW/$p.missing"; log "$p is gone; turning its tweaks off in ${DEPART_AFTER}s unless it comes back" >&2; }
+        nemesis_busy && print "$now" > "$SHADOW/$p.missing"
+        [ $((now - $(cat "$SHADOW/$p.missing"))) -ge $DEPART_AFTER ] && print -r -- "$d"
+    done
+}
+
+# the switch position tweaksd acts on: the app's, except that a retired tweak or one whose
+# pack was removed is off whatever the switch says
+effective_want() {
+    if [ "$(conf "$1" retired 0)" = 1 ] || [ -n "$(get "$1" departed)" ]; then print 0
+    else cat "$WANT/$1" 2>/dev/null; fi
+}
+
+# conflicts= and replaces= list tweaks that must be off before this one turns on; sets
+# BLOCKER to the first one that isn't
+clear_of_conflicts() {
+    local c st
+    set -f
+    for c in $(conf "$1" conflicts) $(conf "$1" replaces); do
+        c=${c%,}
+        [ -f "$INDEX/$c" ] || continue
+        st=$(get "$c" state)
+        case "$st" in on|working|error) set +f; BLOCKER=$(get "$c" name); BLOCKER=${BLOCKER:-$c}; return 1 ;; esac
+    done
+    set +f
+    return 0
+}
+
+# rebuilds $INDEX: every tweak folder of kia.tweaks and the installed tweak packs, then the
+# tweaks of removed packs (from their copies, marked departed) until they are off.
+index_tweaks() {
+    local d id own seen= f gone p
+    # only ever folders inside $SHADOW: these get deleted below
+    gone=
+    for p in $(shadow_packs); do
+        case "$p" in "$SHADOW"/[a-z0-9]*) [ -d "$p" ] && gone="$gone $p" ;; *) log "ignored odd pack folder: $p" ;; esac
+    done
+    for d in "$TWEAKS"/*/ "$PACKS"/*/tweaks/*/ $(for p in $gone; do print "$p/tweaks/*/"; done); do
+        [ -f "$d/tweak.conf" ] || continue
+        d=${d%/}; id=${d##*/}
+        case "$id" in ""|*[!a-z0-9-]*) continue ;; esac
+        case " $seen " in
+            *" $id "*)
+                [ "$(pkg_of "$d")" = "$(pkg_of "$TWEAKS/x")" ] || \
+                    [ -n "$(get "$id" clash)" ] || { put "$id" clash 1; log "$id: also in $(pkg_of "$d"), skipped"; }
+                continue ;;
+        esac
+        seen="$seen $id"
+        rm -f "$RUN/$id.orphan" "$RUN/$id.pending"
+        case "$d" in "$SHADOW"/*) put "$id" departed 1 ;; *) rm -f "$RUN/$id.departed" ;; esac
+        put "$id" pack "$(pkg_of "$d")"
+        own=
+        [ -f "$INDEX/$id" ] && read -r own < "$INDEX/$id"
+        [ "$own" = "$d" ] || { print -r -- "$d" > "$INDEX/$id"; log "$id: from $d"; }
+        put "$id" name "$(conf "$id" name "$id")"
+    done
+    for f in "$INDEX"/*; do
+        [ -f "$f" ] || continue
+        id=${f##*/}
+        case " $seen " in *" $id "*) continue ;; esac
+        [ -n "$(get "$id" orphan)" ] && continue
+        # its pack has a copy: it was removed or is being updated; wait for shadow_packs to tell
+        if [ -d "$SHADOW/$(get "$id" pack)" ]; then
+            [ -n "$(get "$id" pending)" ] || { put "$id" pending 1; put "$id" text "its package is gone; waiting to see if it comes back"; }
+            continue
+        fi
+        [ -n "$(running "$id")" ] && stop_service "$id"
+        if [ "$(get "$id" state)" = on ] && [ "$(get "$id" kind)" = oneshot ]; then
+            # its files went without a copy to turn it off with: say so rather than forget it
+            put "$id" orphan 1
+            set_state "$id" error "left on: $(get "$id" pack) was removed and it can't be turned off from here"
+        else
+            rm -f "$f" "$RUN/$id".*
+            log "$id: its package is gone"
+        fi
+    done
+    # a removed pack whose tweaks are all off (or never applied here): drop its copy
+    for p in $gone; do
+        for d in "$p"/tweaks/*/; do
+            id=${d%/}; id=${id##*/}
+            case "$(get "$id" state)" in on|working|error) continue 2 ;; esac
+        done
+        case "$p" in "$SHADOW"/[a-z0-9]*) rm -rf "$p" "$p.missing" ;; esac
+        log "${p##*/}: removed; its tweaks are off"
+    done
+}
+
 stop_all() {
     local f id
     for f in "$RUN"/*.pid; do
@@ -316,16 +471,26 @@ stop_all() {
 
 # ---- main
 
-mkdir -p $WANT $RUN $LOGS
+cd $DATA 2>/dev/null || cd /
+mkdir -p $WANT $RUN $LOGS $INDEX $SHADOW
 chmod 755 $DATA
-chmod 700 $WANT $RUN $LOGS
+chmod 700 $WANT $RUN $LOGS $INDEX $SHADOW
 log "starting (firmware $FIRMWARE)"
 # a run.sh left over from before an update runs the old script: restart it
 stop_all
 trap 'log "stopping"; stop_all; exit 0' TERM INT HUP
 
+# NEMESIS can restart this service a moment before an update has replaced its files, which
+# leaves the old script running: when the file changes, start over with the new one
+SELF=$(ls -l "$0")
+
 LAST_READ=0 LAST_PROC= APP_READ=
 while :; do
+    if [ "$(ls -l "$0" 2>/dev/null)" != "$SELF" ] && [ -f "$0" ]; then
+        log "tweaksd.sh changed; restarting with the new one"
+        stop_all
+        exec sh "$0"
+    fi
     now=$(date +%s)
     proc=$(app_proc)
     CHANGED=
@@ -343,23 +508,36 @@ while :; do
     LAST_PROC=$proc
     [ -n "$CHANGED" ] && log "switches changed"
 
-    for d in "$TWEAKS"/*/; do
-        id=${d%/}; id=${id##*/}
-        [ -f "$d/tweak.conf" ] || continue
-        if ! supported "$id"; then
-            [ -n "$(running "$id")" ] && stop_service "$id"
-            set_state "$id" unsupported "made for other head unit software"
-            continue
-        fi
-        want=$(cat "$WANT/$id" 2>/dev/null)
-        case "$(conf "$id" kind service)" in
-            service)
-                # nothing known yet: leave it as it is
-                if [ -n "$want" ]; then do_service "$id" "$want"
-                else set_state "$id" off "waiting for the Tweaks app"; fi ;;
-            oneshot) do_oneshot "$id" "$want" "$CHANGED" ;;
-            *) set_state "$id" error "unknown kind in tweak.conf" ;;
-        esac
+    index_tweaks
+    # turning off comes first, so a tweak that replaces or conflicts with another never
+    # runs alongside it: pass 1 handles everything that should be off, pass 2 the rest
+    for pass in off on; do
+        for d in "$INDEX"/*; do
+            [ -f "$d" ] || continue
+            id=${d##*/}
+            [ -n "$(get "$id" orphan)" ] || [ -n "$(get "$id" pending)" ] && continue
+            put "$id" kind "$(conf "$id" kind service)"
+            if ! supported "$id"; then
+                [ $pass = off ] || continue
+                [ -n "$(running "$id")" ] && stop_service "$id"
+                set_state "$id" unsupported "made for other head unit software"
+                continue
+            fi
+            want=$(effective_want "$id")
+            case "$pass:$want" in off:1|on:0|on:) continue ;; esac
+            if [ "$want" = 1 ] && ! clear_of_conflicts "$id"; then
+                set_state "$id" off "waiting for $BLOCKER to turn off"
+                continue
+            fi
+            case "$(get "$id" kind)" in
+                service)
+                    # nothing known yet: leave it as it is
+                    if [ -n "$want" ]; then do_service "$id" "$want"
+                    else set_state "$id" off "waiting for the Tweaks app"; fi ;;
+                oneshot) do_oneshot "$id" "$want" "$CHANGED" ;;
+                *) set_state "$id" error "unknown kind in tweak.conf" ;;
+            esac
+        done
     done
     write_state
     [ "${proc#* }" = fg ] && n=$FAST || n=$SLOW
