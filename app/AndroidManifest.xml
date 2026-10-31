@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="app.cabinwright.tweaks"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+    <uses-sdk android:minSdkVersion="19" android:targetSdkVersion="19" />
+    <!-- The head unit's ActivityManager calls getTasks() when an app finishes its last activity (Back):
+         without this the app crashes on the way out -->
+    <uses-permission android:name="android.permission.GET_TASKS" />
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@drawable/menu_icon"
+        android:allowBackup="false">
+        <activity
+            android:name=".TweaksActivity"
+            android:theme="@style/CarTheme"
+            android:screenOrientation="landscape"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- shows this app in All Menus (Cabinwright launcher hook) -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="app.cabinwright.category.ALL_MENUS" />
+            </intent-filter>
+            <meta-data android:name="app.cabinwright.icon" android:resource="@drawable/menu_icon" />
+            <meta-data android:name="app.cabinwright.icon_disabled" android:resource="@drawable/menu_icon_dis" />
+        </activity>
+    </application>
+</manifest>

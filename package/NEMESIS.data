@@ -1,0 +1,11 @@
+[nemesis]
+id=cabinwright.tweaks
+name=Tweaks
+version=1.0
+types=application
+
+[app.0]
+kind=apk
+path=tweaks.apk
+package=app.cabinwright.tweaks
+component=app.cabinwright.tweaks/.TweaksActivity

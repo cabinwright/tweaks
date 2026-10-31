@@ -1,0 +1,105 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # the Cabinwright API the Tweaks app is built on (CarPage, CarBroker), and its pinned tools
+      # and lint settings, pinned to a release
+      - uses: actions/checkout@v4
+        with:
+          repository: cabinwright/menu
+          ref: v1.0
+          path: menu
+
+      # before setup-java: the runner's sdkmanager needs its default (newer) Java.
+      # Only build-tools: android.jar (API 19) comes from fetch-tools.sh with the rest
+      - name: Android SDK parts
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;29.0.2" > /dev/null
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      # Kotlin, R8, android-19.jar, ktlint, detekt, shellcheck: pinned in the menu's fetch-tools.sh
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/cabinwright-tools
+          key: cabinwright-tools-${{ runner.os }}-${{ hashFiles('menu/api/tools/fetch-tools.sh') }}
+
+      - name: Tools
+        run: sh menu/api/tools/fetch-tools.sh
+
+      # ktlint, detekt and ShellCheck (the tweak scripts as the car's mksh)
+      - name: Lint
+        run: sh menu/api/tools/lint.sh .
+
+      # the patch tool, as R8 shrinks it, on the host's JVM
+      - name: tweakpatch host test
+        run: CABINWRIGHT_MENU=$PWD/menu sh tests/tweakpatch-test.sh
+
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.CABINWRIGHT_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "CABINWRIGHT_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          else
+            # forks and PRs from them: a throwaway debug key
+            mkdir -p ~/.android
+            keytool -genkeypair -keystore ~/.android/debug.keystore -storepass android -keypass android \
+              -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
+          fi
+
+      - name: Version
+        run: |
+          VERSION=$(sed -n 's/^version=//p' package/NEMESIS.data)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+            echo "::error::tag $GITHUB_REF_NAME doesn't match package/NEMESIS.data version $VERSION"
+            exit 1
+          fi
+
+      - name: Build
+        env:
+          CABINWRIGHT_KEYSTORE_PASS: ${{ secrets.CABINWRIGHT_KEYSTORE_PASS }}
+        run: |
+          CABINWRIGHT_MENU=$PWD/menu sh build.sh
+          mv dist/cabinwright.tweaks.zip "dist/cabinwright.tweaks-v$VERSION.zip"
+          mv dist/cabinwright.tweaks.map "dist/cabinwright.tweaks-v$VERSION.map"
+          mv dist/cabinwright.tweaks-tweakpatch.map "dist/cabinwright.tweaks-v$VERSION-tweakpatch.map"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cabinwright.tweaks-v${{ env.VERSION }}
+          path: |
+            dist/*.zip
+            dist/*.map
+
+      - name: Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > "$RUNNER_TEMP/notes.md" <<NOTES
+          NEMESIS package \`cabinwright.tweaks\` $VERSION: the Tweaks app and the base tweaks. Install it
+          from the Cabinwright store, which runs the tweaks.
+          \`cabinwright.tweaks-v$VERSION.map\` (the Tweaks app) and \`cabinwright.tweaks-v$VERSION-tweakpatch.map\`
+          (the patch tool) are R8's name maps, for reading stack traces (retrace).
+          NOTES
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.map --title "Cabinwright tweaks $GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/notes.md" --generate-notes
