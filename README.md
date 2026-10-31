@@ -8,6 +8,7 @@ each with an on/off switch in the **Tweaks** app. Written for the 2023 Kia EV6 (
 | Tweak | What it does |
 |---|---|
 | Automatic daylight saving | Flips the head unit's own daylight-saving switch on the US/Canada schedule. |
+| Cold-start heat | Below 50°F at head unit start, turns on the heated wheel and driver's seat. |
 | Skip start-up screen | No consent / driver screen at start-up. Changes SystemUI on `/system`, so it asks first and needs a restart. |
 
 More tweaks come as tweak packs from the store, such as
@@ -27,6 +28,7 @@ store's [design](https://github.com/cabinwright/store/blob/main/docs/design.md) 
 | `patch/` | `tweakpatch`, a small tool run on the car that rebuilds patched system code from the car's own stock files. |
 | `systemui/` | Builds the skip-consent delta (`patch.py`, `build.sh`) and the USB rescue script. |
 | `tests/tweakpatch-test.sh` | Host test: `tweakpatch`, as R8 shrinks it, against generated deltas and zips. |
+| `tests/coldstart-test.sh` | Host test: the coldstart-heat tweak against a stub `kt`. |
 | `docs/` | Writing a tweak, and notes on the head unit's internals. |
 
 **No manufacturer code is shipped.** The skip-consent tweak carries a delta. On the car, `tweakpatch`

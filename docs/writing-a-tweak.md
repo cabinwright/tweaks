@@ -52,6 +52,7 @@ need=setting:system/summer_time | Keep the "Daylight saving time" switch in the 
 | `setting:<table>/<name>` | changing that Android setting | `kt setting put <table> <name> <value>` |
 | `service:<name>` | starting or stopping that init service | `kt service start\|stop <name>` |
 | `kill:<process>` | restarting that process | `kt kill <process>` |
+| `dump:<service>` | reading that binder service's state | `kt dump <service>` (`dumpsys`) |
 | `binder:<service> <codes>` | those binder transaction codes | `kt binder <service> <code> <args…>` (`service call` syntax) |
 | `root` | anything (first-party review only) | `kt root <command>` |
 
