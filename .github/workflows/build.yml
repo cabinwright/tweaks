@@ -55,7 +55,7 @@ jobs:
       - name: coldstart-heat host test
         run: |
           sudo apt-get install -y mksh
-          KT_SH=mksh sh tests/coldstart-test.sh
+          KT_SH=mksh timeout 60 sh tests/coldstart-test.sh
 
       - name: Signing key
         env:

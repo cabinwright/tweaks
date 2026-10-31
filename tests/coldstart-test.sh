@@ -7,10 +7,10 @@ T=$HERE/package/tweaks/coldstart-heat
 SH=${KT_SH:-sh}
 W=$(mktemp -d)
 PID=
-trap '[ -n "$PID" ] && kill $PID 2>/dev/null; rm -rf "$W"' EXIT
+trap '[ -n "$PID" ] && kill -9 $PID 2>/dev/null; rm -rf "$W"' EXIT
 fails=0
 M=$W/car
-export TWEAK_DATA="$W/data" COLDSTART_WAIT=4 PATH="$W/stubs:$PATH"
+export TWEAK_DATA="$W/data" COLDSTART_WAIT=4 COLDSTART_POLL=0 PATH="$W/stubs:$PATH"
 mkdir -p "$W/stubs"
 cat > "$W/stubs/kt" <<STUB
 #!/bin/sh
@@ -25,11 +25,6 @@ STUB
 cat > "$W/stubs/cat" <<STUB
 #!/bin/sh
 case "\$1" in /proc/sys/kernel/random/boot_id) exec /bin/cat $M/bootid ;; *) exec /bin/cat "\$@" ;; esac
-STUB
-cat > "$W/stubs/sleep" <<'STUB'
-#!/bin/sh
-[ "$1" = 3600 ] && exec /bin/sleep 3600
-exit 0
 STUB
 chmod 755 "$W"/stubs/*
 # <raw F> <decoded F> <raw C> <decoded C>, as the climate service prints them
@@ -49,8 +44,9 @@ start() {
     $SH "$T/run.sh" > "$W/log" 2>&1 &
     PID=$!
     /bin/sleep 0.5
-    pkill -P $PID 2>/dev/null || true
-    kill $PID 2>/dev/null || true
+    # -9: mksh's sleep is a builtin that outlasts a plain kill
+    pkill -9 -P $PID 2>/dev/null || true
+    kill -9 $PID 2>/dev/null || true
     wait $PID 2>/dev/null || true
     PID=
 }

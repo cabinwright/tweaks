@@ -8,6 +8,7 @@
 # doesn't show.
 THRESHOLD_F=50
 WAIT=${COLDSTART_WAIT:-120}
+POLL=${COLDSTART_POLL:-3}
 
 log() { echo "$(date) $1"; }
 last() { echo "$1" > "$TWEAK_DATA/last"; }
@@ -65,7 +66,7 @@ echo "$BOOT" > "$TWEAK_DATA/boot"
 i=0 TEMP_F=
 while [ $i -lt "$WAIT" ]; do
     outside_f && break
-    sleep 3; i=$((i + 3))
+    sleep "$POLL"; i=$((i + 3))
 done
 if [ -z "$TEMP_F" ]; then log "no outside temperature in ${WAIT}s"; last "no reading"; idle; fi
 log "outside ${TEMP_F}F, threshold ${THRESHOLD_F}F"
