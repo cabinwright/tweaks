@@ -51,6 +51,12 @@ jobs:
       - name: tweakpatch host test
         run: CABINWRIGHT_MENU=$PWD/menu sh tests/tweakpatch-test.sh
 
+      # the car's shell
+      - name: coldstart-heat host test
+        run: |
+          sudo apt-get install -y mksh
+          KT_SH=mksh sh tests/coldstart-test.sh
+
       - name: Signing key
         env:
           KEYSTORE_B64: ${{ secrets.CABINWRIGHT_KEYSTORE_B64 }}
