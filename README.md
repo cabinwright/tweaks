@@ -40,12 +40,12 @@ NEMESIS USB stick puts stock SystemUI back from the store's backup.
 ## Build
 
 ```sh
-CABINWRIGHT_MENU=../menu sh build.sh     # -> dist/cabinwright.tweaks.zip, and R8's name maps
-CABINWRIGHT_MENU=../menu sh tests/tweakpatch-test.sh
-sh ../menu/api/tools/lint.sh .           # ktlint, detekt, ShellCheck
+sh build.sh     # -> dist/cabinwright.tweaks.zip, and R8's name maps
+sh tests/tweakpatch-test.sh
+sh sdk/api/tools/lint.sh .           # ktlint, detekt, ShellCheck
 ```
 
-`CABINWRIGHT_MENU` is a checkout of the Cabinwright menu repo (CI pins its release `v1.0`):
+`sdk/` is a submodule of [cabinwright/sdk](https://github.com/cabinwright/sdk), pinned to a release (`git submodule update --init`):
 its `api/` (`CarPage`, `CarBroker`) is compiled into the app, and its `api/tools` build and
 lint everything here with pinned tools (Kotlin, R8, Android 4.4's `android.jar`, ktlint,
 detekt, ShellCheck). Needs the Android SDK's build-tools 29.0.2, JDK 11 and Python 3.

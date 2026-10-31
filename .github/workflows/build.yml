@@ -15,14 +15,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-
-      # the Cabinwright API the Tweaks app is built on (CarPage, CarBroker), and its pinned tools
-      # and lint settings, pinned to a release
-      - uses: actions/checkout@v4
         with:
-          repository: cabinwright/menu
-          ref: v1.0
-          path: menu
+          submodules: true
 
       # before setup-java: the runner's sdkmanager needs its default (newer) Java.
       # Only build-tools: android.jar (API 19) comes from fetch-tools.sh with the rest
@@ -34,22 +28,22 @@ jobs:
           distribution: temurin
           java-version: '11'
 
-      # Kotlin, R8, android-19.jar, ktlint, detekt, shellcheck: pinned in the menu's fetch-tools.sh
+      # Kotlin, R8, android-19.jar, ktlint, detekt, shellcheck: pinned in the SDK's fetch-tools.sh
       - uses: actions/cache@v4
         with:
           path: ~/.cache/cabinwright-tools
-          key: cabinwright-tools-${{ runner.os }}-${{ hashFiles('menu/api/tools/fetch-tools.sh') }}
+          key: cabinwright-tools-${{ runner.os }}-${{ hashFiles('sdk/api/tools/fetch-tools.sh') }}
 
       - name: Tools
-        run: sh menu/api/tools/fetch-tools.sh
+        run: sh sdk/api/tools/fetch-tools.sh
 
       # ktlint, detekt and ShellCheck (the tweak scripts as the car's mksh)
       - name: Lint
-        run: sh menu/api/tools/lint.sh .
+        run: sh sdk/api/tools/lint.sh .
 
       # the patch tool, as R8 shrinks it, on the host's JVM
       - name: tweakpatch host test
-        run: CABINWRIGHT_MENU=$PWD/menu sh tests/tweakpatch-test.sh
+        run: sh tests/tweakpatch-test.sh
 
       # the car's shell
       - name: coldstart-heat host test
@@ -84,7 +78,7 @@ jobs:
         env:
           CABINWRIGHT_KEYSTORE_PASS: ${{ secrets.CABINWRIGHT_KEYSTORE_PASS }}
         run: |
-          CABINWRIGHT_MENU=$PWD/menu sh build.sh
+          sh build.sh
           mv dist/cabinwright.tweaks.zip "dist/cabinwright.tweaks-v$VERSION.zip"
           mv dist/cabinwright.tweaks.map "dist/cabinwright.tweaks-v$VERSION.map"
           mv dist/cabinwright.tweaks-tweakpatch.map "dist/cabinwright.tweaks-v$VERSION-tweakpatch.map"
