@@ -8,6 +8,7 @@ each with an on/off switch in the **Tweaks** app. Written for the 2023 Kia EV6 (
 |---|---|
 | Automatic daylight saving | Flips the head unit's own daylight-saving switch on the US/Canada schedule. |
 | Skip start-up screen | No consent / driver screen at start-up. Changes SystemUI on `/system`, so it asks first and needs a restart. |
+| Cold-start heat | When the head unit starts in the cold, turns on the heated steering wheel and any heated seats you chose. Settings are in [Car Controls](https://github.com/cabinwright/vehicle); without it, the wheel comes on below 50°F. Off by default and not yet tested on an EV6. |
 
 Two older tweaks, "Fix wireless Android Auto not connecting" and "Wireless projection with ADB TCP", are
 retired: they are switched off and hidden, and the
@@ -88,3 +89,6 @@ script.
 
 MIT (see `LICENSE`), Copyright (c) 2026 hazptr. Tweaks ported from HMG Leafia Plus and
 other community packages ship separately as tweak packs, under their own licenses.
+
+Cold-start heat is adapted from [hkmc-coldstart-heat](https://github.com/eclipseempire/hkmc-coldstart-heat),
+MIT, Copyright (c) 2026 Gregory Taylor (eclipseempire).

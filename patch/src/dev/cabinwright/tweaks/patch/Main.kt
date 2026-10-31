@@ -10,6 +10,9 @@
  *                                   exact original and the result matches
  *   zipadd <src.apk> <dex> <dst>    copy of src.apk with the dex added as classes.dex
  *                                   (stored); every existing entry is copied byte for byte
+ *   txn <service> <method>          print this head unit's transaction code for a method of a
+ *                                   binder service, from its own framework (codes differ
+ *                                   between builds); fails if the service or method isn't there
  *
  * Exit 0 on success, 1 with a message on stderr otherwise. A damaged delta or zip is refused
  * with a message, never read past its end.
@@ -42,6 +45,8 @@ fun main(args: Array<String>) {
         fail(e)
     } catch (e: DataFormatException) {
         fail(e)
+    } catch (e: ReflectiveOperationException) {
+        fail(e)
     }
 }
 
@@ -52,9 +57,24 @@ private fun run(args: Array<String>) {
         delta(File(args[1]), File(args[2]), File(args[3]))
     } else if (args.size == 4 && args[0] == "zipadd") {
         zipadd(File(args[1]), File(args[2]), File(args[3]))
+    } else if (args.size == 3 && args[0] == "txn") {
+        println(transaction(args[1], args[2]))
     } else {
-        throw IOException("usage: md5 <file> | delta <lpd> <src> <dst> | zipadd <apk> <dex> <dst>")
+        throw IOException(
+            "usage: md5 <file> | delta <lpd> <src> <dst> | zipadd <apk> <dex> <dst> | txn <service> <method>",
+        )
     }
+}
+
+private fun transaction(service: String, method: String): Int {
+    // all by reflection: the host tests' JVM has no android.os
+    val binder = Class.forName("android.os.ServiceManager")
+        .getMethod("getService", String::class.java).invoke(null, service)
+        ?: throw IOException("no service $service")
+    val descriptor = Class.forName("android.os.IBinder").getMethod("getInterfaceDescriptor").invoke(binder)
+    val field = Class.forName("$descriptor\$Stub").getDeclaredField("TRANSACTION_$method")
+    field.isAccessible = true
+    return field.getInt(null)
 }
 
 private fun fail(e: Exception) {

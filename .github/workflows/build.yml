@@ -30,6 +30,8 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq mksh > /dev/null
           KT_SH=mksh sh tests/tweaksd-test.sh
           KT_SH=bash sh tests/tweaksd-test.sh
+          KT_SH=mksh sh tests/coldstart-test.sh
+          KT_SH=bash sh tests/coldstart-test.sh
 
       # the Cabinwright API the Tweaks app is built on, and its pinned tools and lint settings,
       # pinned to a release

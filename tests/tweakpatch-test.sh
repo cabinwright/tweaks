@@ -45,6 +45,7 @@ cp out with-dex.apk
 refuses "zipadd: has classes.dex" "already has classes.dex" zipadd with-dex.apk dex out
 refuses "zipadd: not a zip" "not a zip" zipadd dex dex out
 refuses "usage" "usage:" frobnicate
+refuses "txn: no framework" "ServiceManager" txn com.hkmc.vr anything
 
 if [ $fails -gt 0 ]; then
     echo "$fails failed"
