@@ -10,7 +10,7 @@
 #   <stock dir> holds SystemUI.apk, SystemUI.odex and framework/ from the car
 #   (adb pull /system/priv-app/SystemUI.apk, .odex, and /system/framework)
 # Needs bsdiff4 for tools/mkdelta.py: PYTHON=<python with bsdiff4==1.3.1> (default python3),
-# and the menu checkout (CABINWRIGHT_MENU, default ../menu) for tweakpatch, which packs the
+# and the menu checkout (CABINWRIGHT_SDK, default ../menu) for tweakpatch, which packs the
 # patched apk exactly as the car does to print its checksum (SUM_OURS in
 # package/tweaks/skip-consent/common.sh).
 set -e
@@ -66,8 +66,8 @@ mkdir -p "$(dirname "$OUT")"
 echo "classes.dex $(md5of "$CS/classes.dex")"
 
 # the patched apk, as the car's tweakpatch packs it
-CABINWRIGHT_MENU=${CABINWRIGHT_MENU:-$HERE/../../menu}
-export CABINWRIGHT_MENU
+CABINWRIGHT_SDK=${CABINWRIGHT_SDK:-$HERE/../../sdk}
+export CABINWRIGHT_SDK
 sh "$HERE/../patch/build.sh" --classes "$WORK/tweakpatch.jar" >/dev/null
 "$JAVA" -cp "$WORK/tweakpatch.jar" app.cabinwright.tweaks.patch.Main zipadd "$STOCK/SystemUI.apk" "$CS/classes.dex" "$CS/SystemUI.apk"
 echo "SUM_OURS=$(md5of "$CS/SystemUI.apk")"

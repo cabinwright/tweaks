@@ -2,12 +2,12 @@
 # Host test: tweakpatch (patch/), as R8 shrinks it, on the host's JVM against fixtures from
 # tests/tweakpatch-fixtures.py: md5, a delta rebuilt byte for byte and the deltas it must
 # refuse, and zipadd's exact output. The car runs the same code as a dex under app_process.
-# Needs the menu checkout for the pinned tools (CABINWRIGHT_MENU, default ../menu) and python3.
+# Needs the menu checkout for the pinned tools (CABINWRIGHT_SDK, default ../menu) and python3.
 # usage: sh tests/tweakpatch-test.sh
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-CABINWRIGHT_MENU=${CABINWRIGHT_MENU:-$ROOT/../menu}
-export CABINWRIGHT_MENU
+CABINWRIGHT_SDK=${CABINWRIGHT_SDK:-$ROOT/sdk}
+export CABINWRIGHT_SDK
 JDK=${JAVA_HOME:-$(/usr/libexec/java_home -v 11)}
 W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
