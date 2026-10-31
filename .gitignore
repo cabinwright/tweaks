@@ -5,4 +5,5 @@ package/lib/*.jar
 *.dex
 .DS_Store
 systemui/tools/
+keyboard/tools/
 systemui/build/
